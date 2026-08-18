@@ -1,0 +1,35 @@
+---
+description: Source mathematical expression language accepted by the compiler
+alwaysApply: true
+---
+
+# Source expression language
+
+Input is a **textual mathematical expression** in a **`.telm`** file. It must support **parentheses** and standard **operator precedence**. Evaluation is in **C**.
+
+## Operators and functions
+
+| Form | Meaning |
+|---|---|
+| `+` `-` `*` `/` | arithmetic |
+| `%` | integer division |
+| `^` | exponentiation |
+| `log` `sin` `cos` `tan` `sqrt` | functions |
+
+## Constants
+
+- Decimal numbers (e.g. `3`, `3.14`)
+- Exponential / scientific numbers (e.g. `1.2e-3`)
+- `i` (imaginary unit)
+- `pi`
+- `e`
+- `phi` (golden ratio)
+
+## Variables
+
+Variables are `$VARNAME`. On `elm run`, bind them as `$NAME:VALUE` (example: `$VAR1:1.345 $VAR2:i $VAR3:e $VAR4:99`). `VALUE` uses the same constant forms as the source language.
+
+## Out of scope until requested
+
+- LaTeX input
+- Implicit multiplication, juxtaposition, or other undeclared syntax

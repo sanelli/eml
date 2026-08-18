@@ -1,0 +1,38 @@
+---
+description: ELM textual format, operator definition, and grammar
+alwaysApply: true
+---
+
+# ELM format
+
+Canonical reference: `docs/All elementary functions from a single operator.html`.
+
+## Operator
+
+```
+elm(x, y) = exp(x) - ln(y)
+```
+
+Paired with the constant `1` (`ln(1) = 0`), this generates the scientific-calculator basis (arithmetic, elementary functions, and constants such as `e`, `pi`, `i`).
+
+## Textual grammar
+
+Closed programs are a binary tree of `elm` and `1`. Parameterized programs also allow `$VARNAME` leaves (bound by `elm run`):
+
+```
+S → 1 | $VARNAME | elm(S, S)
+```
+
+A `.elm` file is ELM text. Without variables it contains only `elm(...)` and `1`.
+
+## Identities (from the paper; use `elm` not `eml`)
+
+- `e = elm(1, 1)`
+- `exp(x) = elm(x, 1)`
+- `ln(z) = elm(1, elm(elm(1, z), 1))`
+
+Further rewrites (arithmetic, trig, constants, …) come from that paper. Prefer its identities over ad-hoc equivalents unless a later optimization pass says otherwise.
+
+## Interpreter
+
+The same executable interprets ELM by evaluating the `elm` tree over complex numbers. Do not require LLVM / .NET / JVM to interpret.

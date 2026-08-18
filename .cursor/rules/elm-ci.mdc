@@ -1,0 +1,30 @@
+---
+description: GitHub PR checks, merge gates, and release executable builds
+alwaysApply: true
+---
+
+# CI and releases
+
+This repo will use **GitHub Actions**. Do not invent workflow files until the user asks for that chunk.
+
+## Pull requests
+
+A PR starts a workflow that:
+
+1. Compiles the project
+2. Runs the tests
+3. Must succeed before the PR can be merged
+
+Treat compile + tests as the merge gate. When coverage reporting exists, include it in the PR check if practical.
+
+## Releases
+
+Creating a **GitHub Release** builds and attaches an `elm` executable.
+
+**TBC:** whether that build can be **cross-compiled** for Linux, macOS, and Windows. Do not assume a matrix of OS binaries until that is decided.
+
+## Out of scope until specified
+
+- Exact workflow YAML, runners, and Alire/GNAT setup
+- Publishing the VS Code extension to a marketplace
+- Signing / installers

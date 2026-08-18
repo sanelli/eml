@@ -1,0 +1,29 @@
+---
+description: Step-by-step implementation process and features that stay out of scope
+alwaysApply: true
+---
+
+# How to work in this repo
+
+The user will request **code in small chunks**. For each request:
+
+- **New feature → new branch**, unless the user says to stay on the current branch (or otherwise instructs). Do not implement a feature on `main` by default.
+- Implement **only** that chunk. Do not write ahead (other packages, unused backends, the VS Code extension, CI YAML, extras).
+- Match existing Ada/Alire layout once it exists.
+- After a chunk, stop. Summarize what was added and what is still missing for that chunk.
+- Do not commit or push unless asked. Creating the feature branch is required; committing is not.
+
+## Tests
+
+Every new feature **must** have tests (happy path and, where possible, negative path: parse errors, bad tokens, unsupported syntax, bad CLI).
+
+When possible, **report code coverage** for the change (tooling TBD; do not skip tests because coverage is not wired yet).
+
+## Out of scope until explicitly requested
+
+- LaTeX (or other) input besides `.telm` / `.elm`
+- Extra debug (traces, stepwise evaluation UI). `elm tokenize` and `elm parse` dumps are in scope.
+- Optimizations (algebraic simplification, ELM-tree depth reduction, backend opts)
+- Programmatic VS Code features (language server, completions, diagnostics) beyond declarative editing
+
+Do not design APIs around these until they are in scope.

@@ -1,0 +1,48 @@
+---
+description: elm CLI commands, flags, file extensions, and variable bindings
+alwaysApply: true
+---
+
+# Command line
+
+The Ada executable is invoked as `elm`. Front-end is chosen from the **input extension**: `.telm` (source expression) or `.elm` (ELM text).
+
+## `tokenize`
+
+Dump the token stream to `*.tokens`.
+
+```
+elm tokenize --input filename.telm --output other.tokens
+elm tokenize --input filename.elm --output other.tokens
+```
+
+## `parse`
+
+Dump the syntax tree to `*.syntaxtree`.
+
+```
+elm parse --input filename.telm --output other.syntaxtree
+elm parse --input filename.elm --output other.syntaxtree
+```
+
+## `compile`
+
+```
+elm compile --input filename.telm --output other.elm
+elm compile --input filename.telm --output other.dll --format=cli
+elm compile --input filename.telm --output other.bytecode --format=bytecode
+elm compile --input filename.telm --output other --format=binary
+```
+
+`--format` values: `cli` (.NET CLI DLL), `bytecode` (Java), `binary` (LLVM native). ELM text is implied by output `*.elm` (no `--format` in the examples). `.telm` and `.elm` inputs are both valid; pick the matching tokenizer/parser.
+
+## `run`
+
+Interpret. Bind variables as extra arguments `$NAME:VALUE`. `VALUE` is a source constant (decimal, scientific, `i`, `e`, `pi`, `phi`, …).
+
+```
+elm run --input filename.telm $VAR1:1.345 $VAR2:i $VAR3:e $VAR4:99
+elm run --input filename.elm $VAR1:1.345 $VAR2:i $VAR3:e $VAR4:99
+```
+
+Do not invent extra subcommands or flags beyond this surface unless the user asks.

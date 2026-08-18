@@ -1,0 +1,37 @@
+---
+description: Ada/Alire architecture, tokenizers, parsers, regex automata, and IR pipeline
+alwaysApply: true
+---
+
+# Architecture
+
+- Language: **Ada**
+- Toolchain: **Alire**
+- Libraries (Ada crate): **no third-party crates**, except **LLVM bindings** for the native backend. All GNAT/Ada standard libraries are allowed. The VS Code extension may use the VS Code extension APIs (and usual npm tooling).
+- Ship **one Ada executable** (compiler + interpreter), named `elm`.
+- Also ship a **VS Code extension** (separate from the Ada crate; see `elm-vscode`).
+
+## Required components
+
+1. **Regex automata library** (in-repo): compile regular expressions to automata and match with them. Tokenizers must use this library, not an ad-hoc scanner and not an external regex crate.
+2. **Two tokenizers** (regex-based): source-expression tokens, and ELM-text tokens.
+3. **Two parsers**: each consumes its tokenizer’s tokens and builds a syntax tree.
+4. **Shared IR ELM**: both parsers lower to the same intermediate representation (an `elm` tree). Downstream stages consume only IR ELM.
+
+Tokenizers emit tokens. Parsers emit trees / IR. Do not skip the parse step.
+
+## Pipelines
+
+```
+.telm → expr tokenizer → expr parser → IR ELM → .elm | native | .NET | JVM | interpret
+.elm  → elm tokenizer  → elm parser  → IR ELM → native | .NET | JVM | interpret
+.telm | .elm → tokenize → .tokens
+.telm | .elm → parse     → .syntaxtree
+```
+
+Input extension selects the tokenizer/parser. `tokenize` stops at tokens; `parse` stops at the syntax tree. Neither requires lowering to backends.
+
+## Implementation constraints
+
+- Implement only the chunk the user requested; do not scaffold unused backends or packages ahead of time.
+- Keep expression front-end, ELM front-end, IR, interpreter, and each backend separable.
