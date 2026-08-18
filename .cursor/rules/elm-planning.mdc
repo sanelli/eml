@@ -1,0 +1,35 @@
+---
+description: Plan-before-feature workflow with 1:1 numbered steps and TODOs
+alwaysApply: true
+---
+
+# Plan before a feature
+
+Do **not** start implementing a new feature until a **plan** exists for it. The plan must include:
+
+1. A **step-by-step** description of the work
+2. The **tests** for the feature (happy path and negative path where possible)
+3. A **TODO list** that maps **1:1** to the steps
+
+## Numbering (mandatory)
+
+- Steps and TODOs must have the **same count** and the **same numbering**.
+- Step `N` is TODO `N`. Same title/intent. No extra TODOs, no missing TODOs, no reordering.
+
+Example:
+
+```
+Steps:  1. Add regex lexer  2. Tokenize .telm  3. Tests for lexer
+TODOs:  1. Add regex lexer  2. Tokenize .telm  3. Tests for lexer
+```
+
+## Branch
+
+Before working the plan, check the current git branch.
+
+- The branch name must be **similar to the plan name** (e.g. plan “regex automata” → `regex-automata` or `feature/regex-automata`).
+- If it is not, **ask permission** to create that branch. Do not create it silently. Do not implement the plan on `main` unless the user says so.
+
+## After the plan
+
+Wait for the user to instruct which step/chunk to implement. Then follow `elm-process`.

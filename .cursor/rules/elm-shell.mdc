@@ -1,0 +1,23 @@
+---
+description: PowerShell, proxy, and sandbox handling for network commands
+alwaysApply: true
+---
+
+# Shell, proxy, and sandbox
+
+This environment is **PowerShell**. Cursor often injects a broken local HTTP/SOCKS proxy (`127.0.0.1:64435` / `64434`) that makes git, `gh`, and other network tools fail with “Couldn't connect to server”. Heredocs (`cat <<'EOF'`) are not valid PowerShell; use a here-string (`@' ... '@`) for commit messages.
+
+## Network operations (git push/pull, gh, Alire, downloads, …)
+
+Do **not** rely on the default sandbox proxy. For any command that needs the internet:
+
+1. Request network access (`full_network` or `all`, as required).
+2. **Clear proxy env vars** for that command before running it:
+
+```powershell
+Remove-Item Env:ALL_PROXY, Env:all_proxy, Env:GIT_HTTP_PROXY, Env:GIT_HTTPS_PROXY, Env:http_proxy, Env:HTTP_PROXY, Env:https_proxy, Env:HTTPS_PROXY, Env:SOCKS_PROXY, Env:socks_proxy, Env:SOCKS5_PROXY, Env:socks5_proxy -ErrorAction SilentlyContinue
+```
+
+3. Then run the real command (e.g. `git push`).
+
+Do not change `git config` to work around this. If a push to `main` (or another protected branch) is blocked for approval, retry with approval — the user asked for that push.

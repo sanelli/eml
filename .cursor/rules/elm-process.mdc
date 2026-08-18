@@ -5,13 +5,14 @@ alwaysApply: true
 
 # How to work in this repo
 
-The user will request **code in small chunks**. For each request:
+The user will request **code in small chunks**. For each **new feature**:
 
-- **New feature → new branch**, unless the user says to stay on the current branch (or otherwise instructs). Do not implement a feature on `main` by default.
+- First produce a **plan** (`elm-planning`): numbered steps, matching numbered TODOs, and tests. Do not implement until the user starts a chunk.
+- Check the git branch name matches the plan. If not, **ask** to create one. Do not implement on `main` unless told to.
 - Implement **only** that chunk. Do not write ahead (other packages, unused backends, the VS Code extension, CI YAML, extras).
 - Match existing Ada/Alire layout once it exists.
 - After a chunk, stop. Summarize what was added and what is still missing for that chunk.
-- Do not commit or push unless asked. Creating the feature branch is required; committing is not.
+- Do not commit or push unless asked. Network commands: `elm-shell` (grant network, clear proxy env vars).
 
 ## Tests
 
