@@ -4,7 +4,7 @@ with Ada.Text_IO;
 with CLI_Tests;
 with Elm_Parser;
 with Elm_Tokenizer;
-with Expr_Parser;
+with Expr_Parser_Tests;
 with Expr_Tokenizer_Tests;
 with Interpreter;
 with IR_Elm;
@@ -25,11 +25,11 @@ procedure Elm_Tests is
 begin
    Regex_Automata_Tests.Run (Failed);
    Expr_Tokenizer_Tests.Run (Failed);
+   Expr_Parser_Tests.Run (Failed);
    CLI_Tests.Run (Failed);
 
    --  Remaining stubs still present
    Require (Elm_Tokenizer.Name = "elm_tokenizer", "Elm_Tokenizer.Name");
-   Require (Expr_Parser.Name = "expr_parser", "Expr_Parser.Name");
    Require (Elm_Parser.Name = "elm_parser", "Elm_Parser.Name");
    Require (IR_Elm.Name = "ir_elm", "IR_Elm.Name");
    Require (Interpreter.Name = "interpreter", "Interpreter.Name");

@@ -16,6 +16,20 @@ Input is a **textual mathematical expression** in a **`.telm`** file. It must su
 | `^` | exponentiation |
 | `log` `sin` `cos` `tan` `sqrt` `sinh` `cosh` `tanh` | functions |
 
+## Operator precedence
+
+Parentheses change structure only (they are not syntax-tree nodes). One expression per file.
+
+| Level | Forms | Associativity |
+|---|---|---|
+| Primary | number, constant, `$VAR`, `(e)`, `func(e)` | n/a |
+| Unary | prefix `+` `-` | right |
+| Power | `^` | right |
+| Mul | `*` `/` `%` | left |
+| Add | `+` `-` | left |
+
+Examples: `1+2*3` is add(1, mul(2, 3)); `2^3^2` is pow(2, pow(3, 2)); `-2^2` is neg(pow(2, 2)). Functions take exactly one parenthesized argument. Implicit multiplication / juxtaposition is not allowed.
+
 ## Constants
 
 - Decimal numbers (e.g. `3`, `3.14`)

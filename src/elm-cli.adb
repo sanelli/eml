@@ -2,15 +2,20 @@ with Ada.Exceptions;
 with Ada.Text_IO;
 
 with Elm.Info;
+with Expr_Parser;
 with Expr_Tokenizer;
 
 package body Elm.CLI is
 
    use Ada.Strings.Unbounded;
    use type Expr_Tokenizer.Diagnostic_Array_Access;
+   use type Expr_Parser.Output_Format;
 
    Red_On  : constant String := ASCII.ESC & "[31m";
    Red_Off : constant String := ASCII.ESC & "[0m";
+
+   Expected_Cmds : constant String :=
+     "help, tokenize, or parse";
 
    function Identity return String is
    begin
@@ -72,6 +77,12 @@ package body Elm.CLI is
         ("  elm tokenize --input|-i <file.telm> "
          & "[--output|-o <file.tokens>] [--no-color] [--no-logo]",
          Use_Color);
+      Put_Stderr
+        ("  elm parse --input|-i <file.telm> "
+         & "[--output|-o <file>] "
+         & "[--output-format|-of mermaid|md|dot|svg] "
+         & "[--no-color] [--no-logo]",
+         Use_Color);
    end Put_Usage_Lines;
 
    procedure Put_General_Help is
@@ -88,7 +99,9 @@ package body Elm.CLI is
       Put_Stdout
         ("  tokenize   Dump the token stream of a .telm source file");
       Put_Stdout
-        ("             (parse, compile, and run are not implemented yet)");
+        ("  parse      Dump the syntax tree of a .telm source file");
+      Put_Stdout
+        ("             (compile and run are not implemented yet)");
       Put_Stdout ("");
       Put_Stdout ("Common options:");
       Put_Stdout
@@ -99,10 +112,13 @@ package body Elm.CLI is
       Put_Stdout ("Examples:");
       Put_Stdout ("  elm help");
       Put_Stdout ("  elm help tokenize");
+      Put_Stdout ("  elm help parse");
       Put_Stdout ("  elm tokenize -i filename.telm");
+      Put_Stdout ("  elm parse -i filename.telm");
       Put_Stdout ("");
       Put_Stdout
-        ("Exit status: 0 on success, 1 on CLI, I/O, or lex errors.");
+        ("Exit status: 0 on success, 1 on CLI, I/O, lex, or parse "
+         & "errors.");
    end Put_General_Help;
 
    procedure Put_Tokenize_Help is
@@ -139,6 +155,53 @@ package body Elm.CLI is
         ("Exit status: 0 if no invalid tokens, otherwise 1.");
    end Put_Tokenize_Help;
 
+   procedure Put_Parse_Help is
+   begin
+      Put_Stdout ("elm parse - dump the syntax tree from a .telm file");
+      Put_Stdout ("");
+      Put_Stdout ("Usage:");
+      Put_Stdout
+        ("  elm parse --input|-i <file.telm> "
+         & "[--output|-o <file>] "
+         & "[--output-format|-of mermaid|md|dot|svg] "
+         & "[--no-color] [--no-logo]");
+      Put_Stdout ("");
+      Put_Stdout ("Options:");
+      Put_Stdout
+        ("  --input, -i <file.telm>       Required input (.telm only)");
+      Put_Stdout
+        ("  --output, -o <file>          Optional dump file; if omitted,");
+      Put_Stdout
+        ("                               the tree goes to stdout");
+      Put_Stdout
+        ("  --output-format, -of <fmt>   mermaid (default), md, dot, svg");
+      Put_Stdout
+        ("  --no-color                   Plain stderr diagnostics");
+      Put_Stdout
+        ("  --no-logo                    Suppress the startup banner");
+      Put_Stdout ("");
+      Put_Stdout ("Output extensions must match the format:");
+      Put_Stdout ("  mermaid -> .syntaxtree");
+      Put_Stdout ("  md      -> .md");
+      Put_Stdout ("  dot     -> .dot");
+      Put_Stdout ("  svg     -> .svg");
+      Put_Stdout ("");
+      Put_Stdout ("Examples:");
+      Put_Stdout ("  elm parse -i filename.telm");
+      Put_Stdout
+        ("  elm parse -i filename.telm -o other.syntaxtree");
+      Put_Stdout
+        ("  elm parse -i filename.telm -of md -o other.md");
+      Put_Stdout
+        ("  elm --no-logo parse -i filename.telm -of svg -o t.svg");
+      Put_Stdout ("");
+      Put_Stdout
+        ("Lex and parse errors are reported on stderr; no tree is "
+         & "written on failure.");
+      Put_Stdout
+        ("Exit status: 0 on success, otherwise 1.");
+   end Put_Parse_Help;
+
    procedure Fail_CLI (Message : String; Use_Color : Boolean) is
    begin
       Put_Stderr (Message, Use_Color);
@@ -166,6 +229,40 @@ package body Elm.CLI is
       Ada.Text_IO.Close (File);
       return To_String (Buffer);
    end Read_File;
+
+   function Parse_Format
+     (S : String; Ok : out Boolean) return Expr_Parser.Output_Format
+   is
+   begin
+      Ok := True;
+      if S = "mermaid" then
+         return Expr_Parser.Mermaid;
+      elsif S = "md" then
+         return Expr_Parser.Markdown;
+      elsif S = "dot" then
+         return Expr_Parser.Dot;
+      elsif S = "svg" then
+         return Expr_Parser.Svg;
+      else
+         Ok := False;
+         return Expr_Parser.Mermaid;
+      end if;
+   end Parse_Format;
+
+   function Format_Extension (Fmt : Expr_Parser.Output_Format) return String
+   is
+   begin
+      case Fmt is
+         when Expr_Parser.Mermaid =>
+            return ".syntaxtree";
+         when Expr_Parser.Markdown =>
+            return ".md";
+         when Expr_Parser.Dot =>
+            return ".dot";
+         when Expr_Parser.Svg =>
+            return ".svg";
+      end case;
+   end Format_Extension;
 
    function Run_Tokenize
      (Input_Path  : String;
@@ -208,20 +305,77 @@ package body Elm.CLI is
       return Ada.Command_Line.Success;
    end Run_Tokenize;
 
+   function Run_Parse
+     (Input_Path  : String;
+      Output_Path : String;
+      Has_Output  : Boolean;
+      Fmt         : Expr_Parser.Output_Format;
+      Use_Color   : Boolean) return Ada.Command_Line.Exit_Status
+   is
+      Source : constant String := Read_File (Input_Path);
+      Tok    : constant Expr_Tokenizer.Tokenize_Result :=
+        Expr_Tokenizer.Tokenize (Source);
+   begin
+      if Tok.Had_Errors then
+         if Tok.Diagnostics /= null then
+            for D of Tok.Diagnostics.all loop
+               Put_Stderr
+                 ("error: invalid token at line "
+                  & Trim_Positive (D.Line)
+                  & ", column "
+                  & Trim_Positive (D.Column)
+                  & ": "
+                  & To_String (D.Message),
+                  Use_Color);
+            end loop;
+         end if;
+         return Ada.Command_Line.Failure;
+      end if;
+
+      declare
+         Parsed : constant Expr_Parser.Parse_Result :=
+           Expr_Parser.Parse (Tok.Tokens.all);
+      begin
+         if Parsed.Had_Error then
+            Put_Stderr
+              ("error: parse error at line "
+               & Trim_Positive (Parsed.Error_Line)
+               & ", column "
+               & Trim_Positive (Parsed.Error_Col)
+               & ": "
+               & To_String (Parsed.Message),
+               Use_Color);
+            return Ada.Command_Line.Failure;
+         end if;
+
+         if Has_Output then
+            Expr_Parser.Write_To_File
+              (Parsed.Root, Fmt, Output_Path);
+         else
+            Expr_Parser.Write_To_Stdout (Parsed.Root, Fmt);
+         end if;
+         return Ada.Command_Line.Success;
+      end;
+   end Run_Parse;
+
    function Run (Args : Arg_Array) return Ada.Command_Line.Exit_Status is
-      No_Color    : Boolean := False;
-      No_Logo     : Boolean := False;
-      Subcommand  : Unbounded_String;
-      Topic       : Unbounded_String;
-      Input_Path  : Unbounded_String;
-      Output_Path : Unbounded_String;
-      Have_Input  : Boolean := False;
-      Have_Output : Boolean := False;
-      Have_Sub    : Boolean := False;
-      Have_Topic  : Boolean := False;
-      I           : Positive := 1;
-      Use_Color   : Boolean;
-      Cmd         : Unbounded_String;
+      No_Color     : Boolean := False;
+      No_Logo      : Boolean := False;
+      Subcommand   : Unbounded_String;
+      Topic        : Unbounded_String;
+      Input_Path   : Unbounded_String;
+      Output_Path  : Unbounded_String;
+      Format_Text  : Unbounded_String;
+      Have_Input   : Boolean := False;
+      Have_Output  : Boolean := False;
+      Have_Format  : Boolean := False;
+      Have_Sub     : Boolean := False;
+      Have_Topic   : Boolean := False;
+      I            : Positive := 1;
+      Use_Color    : Boolean;
+      Cmd          : Unbounded_String;
+      Fmt          : Expr_Parser.Output_Format := Expr_Parser.Mermaid;
+      Format_Ok    : Boolean;
    begin
       I := Args'First;
       while I <= Args'Last loop
@@ -241,7 +395,9 @@ package body Elm.CLI is
                   end if;
                   Fail_CLI
                     ("error: missing command "
-                     & "(expected help or tokenize); got '"
+                     & "(expected "
+                     & Expected_Cmds
+                     & "); got '"
                      & A
                      & "'",
                      not No_Color);
@@ -310,6 +466,26 @@ package body Elm.CLI is
                Output_Path := Args (I + 1);
                Have_Output := True;
                I := I + 2;
+            elsif A = "--output-format" or else A = "-of" then
+               if Have_Format then
+                  if not No_Logo then
+                     Put_Banner;
+                  end if;
+                  Fail_CLI
+                    ("error: repeated --output-format/-of", not No_Color);
+                  return Ada.Command_Line.Failure;
+               end if;
+               if I = Args'Last then
+                  if not No_Logo then
+                     Put_Banner;
+                  end if;
+                  Fail_CLI
+                    ("error: missing value for " & A, not No_Color);
+                  return Ada.Command_Line.Failure;
+               end if;
+               Format_Text := Args (I + 1);
+               Have_Format := True;
+               I := I + 2;
             else
                if not No_Logo then
                   Put_Banner;
@@ -330,7 +506,7 @@ package body Elm.CLI is
 
       if not Have_Sub then
          Fail_CLI
-           ("error: missing command (expected help or tokenize)",
+           ("error: missing command (expected " & Expected_Cmds & ")",
             Use_Color);
          return Ada.Command_Line.Failure;
       end if;
@@ -342,6 +518,9 @@ package body Elm.CLI is
          elsif To_String (Topic) = "tokenize" then
             Put_Tokenize_Help;
             return Ada.Command_Line.Success;
+         elsif To_String (Topic) = "parse" then
+            Put_Parse_Help;
+            return Ada.Command_Line.Success;
          else
             Fail_CLI
               ("error: unknown help topic '"
@@ -352,11 +531,22 @@ package body Elm.CLI is
          end if;
       end if;
 
-      if To_String (Cmd) /= "tokenize" then
+      if To_String (Cmd) /= "tokenize"
+        and then To_String (Cmd) /= "parse"
+      then
          Fail_CLI
            ("error: unknown command '"
             & To_String (Cmd)
-            & "' (expected help or tokenize)",
+            & "' (expected "
+            & Expected_Cmds
+            & ")",
+            Use_Color);
+         return Ada.Command_Line.Failure;
+      end if;
+
+      if Have_Format and then To_String (Cmd) /= "parse" then
+         Fail_CLI
+           ("error: --output-format/-of is only valid for parse",
             Use_Color);
          return Ada.Command_Line.Failure;
       end if;
@@ -371,18 +561,62 @@ package body Elm.CLI is
          return Ada.Command_Line.Failure;
       end if;
 
+      if To_String (Cmd) = "tokenize" then
+         if Have_Output
+           and then not Ends_With (To_String (Output_Path), ".tokens")
+         then
+            Fail_CLI ("error: output must be a .tokens file", Use_Color);
+            return Ada.Command_Line.Failure;
+         end if;
+
+         begin
+            return Run_Tokenize
+              (To_String (Input_Path),
+               To_String (Output_Path),
+               Have_Output,
+               Use_Color);
+         exception
+            when E : others =>
+               Put_Stderr
+                 ("error: " & Ada.Exceptions.Exception_Message (E),
+                  Use_Color);
+               return Ada.Command_Line.Failure;
+         end;
+      end if;
+
+      --  parse
+      if Have_Format then
+         Fmt := Parse_Format (To_String (Format_Text), Format_Ok);
+         if not Format_Ok then
+            Fail_CLI
+              ("error: unknown output format '"
+               & To_String (Format_Text)
+               & "' (expected mermaid, md, dot, or svg)",
+               Use_Color);
+            return Ada.Command_Line.Failure;
+         end if;
+      end if;
+
       if Have_Output
-        and then not Ends_With (To_String (Output_Path), ".tokens")
+        and then not Ends_With
+          (To_String (Output_Path), Format_Extension (Fmt))
       then
-         Fail_CLI ("error: output must be a .tokens file", Use_Color);
+         Fail_CLI
+           ("error: output must end with "
+            & Format_Extension (Fmt)
+            & " for format "
+            & (if Have_Format then To_String (Format_Text)
+               else "mermaid"),
+            Use_Color);
          return Ada.Command_Line.Failure;
       end if;
 
       begin
-         return Run_Tokenize
+         return Run_Parse
            (To_String (Input_Path),
             To_String (Output_Path),
             Have_Output,
+            Fmt,
             Use_Color);
       exception
          when E : others =>
