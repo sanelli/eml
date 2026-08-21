@@ -31,6 +31,12 @@ Before working the plan, check the current git branch.
 - If it is not, **ask permission** to create that branch from `main`. Do not create it silently. Do not implement the plan on `main` unless the user says so.
 - After the user grants permission, **create** the feature branch from `main` before implementing any step. Prefer `feature/<plan-slug>` (or the name the user chose).
 
+## Plans are versioned
+
+- Feature plans live under [`.cursor/plans/`](.cursor/plans/) (e.g. `*.plan.md`).
+- **Commit plans** to git with the feature work (or as soon as the plan is accepted). Do not leave new or updated plans untracked.
+- Keep the plan file in the repo after the feature lands on `main` so history stays auditable. Do not delete plan files unless the user asks.
+
 ## After the plan
 
 Wait for the user to instruct which step/chunk to implement. Then follow `elm-process`.
