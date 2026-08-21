@@ -1,5 +1,14 @@
-# Object file
+# Object / ALI
 *.o
-
-# Ada Library Information
 *.ali
+
+# Alire / GNAT build artifacts
+/alire/
+/bin/
+/obj/
+/config/
+
+# Editor / OS
+.DS_Store
+*~
+*.swp

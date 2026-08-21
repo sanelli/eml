@@ -1,0 +1,27 @@
+name = "elm"
+description = "ELM compiler and interpreter"
+version = "0.1.0-dev"
+
+authors = ["Stefano Anelli"]
+maintainers = ["Stefano Anelli <redacted@redacted.com>"]
+maintainers-logins = ["sanelli"]
+licenses = "MIT"
+website = ""
+tags = ["elm", "compiler", "interpreter"]
+
+executables = ["elm", "elm_tests"]
+
+[build-switches]
+"*".ada_version = "Ada2022"
+"*".compile_checks = "Errors"
+"*".contracts = "Yes"
+"*".runtime_checks = "Everything"
+"*".style_checks = "Yes"
+"*".source_encoding = "utf_8"
+development.optimization = "Debug"
+development.debug_info = "Yes"
+validation.compile_checks = "Errors"
+validation.style_checks = "Yes"
+validation.runtime_checks = "Everything"
+release.compile_checks = "Errors"
+release.style_checks = "Yes"

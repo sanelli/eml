@@ -1,0 +1,44 @@
+with "config/elm_config.gpr";
+
+project Elm is
+
+   for Source_Dirs use ("src/", "tests/", "config/");
+   for Object_Dir use "obj/" & Elm_Config.Build_Profile;
+   for Create_Missing_Dirs use "True";
+   for Exec_Dir use "bin";
+   for Main use ("elm-main.adb", "elm_tests.adb");
+
+   --  GNAT FSF for Darwin embeds MacOSX14.sdk; when that SDK is missing,
+   --  force the active CLT SDK via SDKROOT (or the default path below).
+   Sysroot := External
+     ("SDKROOT",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk");
+
+   package Compiler is
+      for Default_Switches ("Ada") use Elm_Config.Ada_Compiler_Switches;
+   end Compiler;
+
+   package Builder is
+      for Executable ("elm-main.adb") use "elm";
+      for Executable ("elm_tests.adb") use "elm_tests";
+   end Builder;
+
+   package Binder is
+      for Switches ("Ada") use ("-Es"); --  Symbolic traceback
+   end Binder;
+
+   package Linker is
+      case Elm_Config.Alire_Host_OS is
+         when "macos" =>
+            for Default_Switches ("Ada") use
+              ("-Wl,-syslibroot," & Sysroot);
+         when others =>
+            null;
+      end case;
+   end Linker;
+
+   package Install is
+      for Artifacts (".") use ("share");
+   end Install;
+
+end Elm;

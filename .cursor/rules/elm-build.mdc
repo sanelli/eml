@@ -1,0 +1,24 @@
+---
+description: Build strictness — warnings forbidden, Alire/GPR compiler switches
+alwaysApply: true
+---
+
+# Build and compiler strictness
+
+**Warnings are forbidden.** Any compiler warning or error must be fixed before work is considered done. Do not leave warnable code in the tree.
+
+## Required Alire / GPR switches
+
+Configure strictness in [`alire.toml`](alire.toml) via `[build-switches]` so Alire-generated `config/` keeps, at minimum:
+
+- `compile_checks = "Errors"` (warnings as errors, including `-gnatwe`)
+- `style_checks = "Yes"`
+- `runtime_checks = "Everything"`
+- `contracts = "Yes"`
+- `ada_version = "Ada2022"`
+
+Do not relax these switches to silence problems. Fix the code instead. The GPR must use `Elm_Config.Ada_Compiler_Switches` (or equivalent) and must not override them with a weaker set.
+
+## Scope
+
+Applies to the `elm` executable, library units, and in-repo test binaries alike.

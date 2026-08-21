@@ -28,7 +28,8 @@ TODOs:  1. Add regex lexer  2. Tokenize .telm  3. Tests for lexer
 Before working the plan, check the current git branch.
 
 - The branch name must be **similar to the plan name** (e.g. plan “regex automata” → `regex-automata` or `feature/regex-automata`).
-- If it is not, **ask permission** to create that branch. Do not create it silently. Do not implement the plan on `main` unless the user says so.
+- If it is not, **ask permission** to create that branch from `main`. Do not create it silently. Do not implement the plan on `main` unless the user says so.
+- After the user grants permission, **create** the feature branch from `main` before implementing any step. Prefer `feature/<plan-slug>` (or the name the user chose).
 
 ## After the plan
 
