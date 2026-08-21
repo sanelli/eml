@@ -14,7 +14,7 @@ Input is a **textual mathematical expression** in a **`.telm`** file. It must su
 | `+` `-` `*` `/` | arithmetic |
 | `%` | integer division |
 | `^` | exponentiation |
-| `log` `sin` `cos` `tan` `sqrt` | functions |
+| `log` `sin` `cos` `tan` `sqrt` `sinh` `cosh` `tanh` | functions |
 
 ## Constants
 

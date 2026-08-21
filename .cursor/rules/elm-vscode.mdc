@@ -21,5 +21,5 @@ Programmatic features (language server, completions, diagnostics, go-to-definiti
 ## Constraints
 
 - Register both file types: source `.telm` and ELM `.elm`.
-- Highlighting must distinguish `elm(...)`, `1`, constants, `$VARNAME`, operators, and functions in `.telm`.
+- Highlighting must distinguish `elm(...)`, `1`, constants, `$VARNAME`, operators, and functions in `.telm` (including hyperbolic `sinh`, `cosh`, `tanh` alongside `sin`, `cos`, `tan`, `log`, `sqrt`).
 - Do not couple the extension to LLVM / .NET / JVM backends.

@@ -7,14 +7,85 @@ alwaysApply: true
 
 The Ada executable is invoked as `elm`. Front-end is chosen from the **input extension**: `.telm` (source expression) or `.elm` (ELM text).
 
+## Global options
+
+- `--no-color` — plain-text diagnostics and usage on stderr (no ANSI red). Allowed before or after the subcommand.
+- `--no-logo` — suppress the startup banner. Allowed before or after the subcommand.
+
+## `help`
+
+```
+elm help
+elm help tokenize
+```
+
+- `elm help` — usage, command list, and common options on stdout; exit `0`
+- `elm help tokenize` — tokenize-specific usage and options on stdout; exit `0`
+- Unknown topic → stderr error + usage, exit `1`
+- Banner is still printed unless `--no-logo` is set
+
+## Startup banner
+
+Unless `--no-logo` is set, `elm` prints a short banner to **stdout** (never stderr, never the `--output` file):
+
+```
+elm  <version>
+Author: Stefano Anelli
+Commit: <short-hash>
+```
+
+With `--output`/`-o`, the banner still goes to stdout while tokens go only to the file. Without `-o`, stdout is the banner (unless `--no-logo`) then the token dump; use `--no-logo` for a pure dump (pipes, tests).
+
 ## `tokenize`
 
-Dump the token stream to `*.tokens`.
+Dump the token stream. Input is required; output is optional.
+
+```
+elm tokenize --input|-i <file.telm> [--output|-o <file.tokens>] [--no-color] [--no-logo]
+```
+
+- `--input` / `-i` — required; must end in `.telm` (this stage; `.elm` tokenize comes later)
+- `--output` / `-o` — optional; if present must end in `.tokens`; if omitted, the dump goes to stdout
+- Flag order after `tokenize` is free; space-separated only (no `--input=`)
+
+### `.tokens` dump format
+
+One token per line, no header, no EOF token, no skipped whitespace:
+
+```
+<line>:<column> <KIND> <lexeme>
+```
+
+`line` and `column` are 1-based. Invalid tokens are not written to the dump.
+
+### Errors and exit codes
+
+- Invalid CLI → short error + usage on stderr (red unless `--no-color`), plus a hint to try `elm help`, exit `1`
+- Missing command (e.g. `elm --input f.telm` with no command) → `error: missing command (expected help or tokenize); got '--input'` (or without `; got …` when no args), exit `1`
+- Lex errors → human-readable lines on stderr (`error: invalid token at line N, column M: …`), continue scanning, still emit valid tokens, exit `1`
+- I/O failure → stderr diagnostic, exit `1`
+- Success (zero invalid tokens) → exit `0`
+- `elm help` / `elm help tokenize` → help on stdout, exit `0`
+
+Usage text (errors):
+
+```
+Usage:
+  elm <command> [options]
+  elm help [command]
+  elm tokenize --input|-i <file.telm> [--output|-o <file.tokens>] [--no-color] [--no-logo]
+Try 'elm help' for more information.
+```
+
+Examples:
 
 ```
 elm tokenize --input filename.telm --output other.tokens
-elm tokenize --input filename.elm --output other.tokens
+elm tokenize -i filename.telm
+elm tokenize --no-logo -i filename.telm -o other.tokens
 ```
+
+`.elm` tokenize is not implemented yet; treating a `.elm` input as tokenize is invalid CLI for now.
 
 ## `parse`
 

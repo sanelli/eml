@@ -1,0 +1,1 @@
+sin($THETA) + cos($THETA) * i + log(sqrt($R)) + tanh($X)
