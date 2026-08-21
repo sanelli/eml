@@ -11,6 +11,10 @@ tags = ["elm", "compiler", "interpreter"]
 
 executables = ["elm", "elm_tests"]
 
+[[actions]]
+type = "pre-build"
+command = ["pwsh", "-NoProfile", "-File", "scripts/embed_git_commit.ps1"]
+
 [build-switches]
 "*".ada_version = "Ada2022"
 "*".compile_checks = "Errors"
