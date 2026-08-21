@@ -34,8 +34,9 @@ Before working the plan, check the current git branch.
 ## Plans are versioned
 
 - Feature plans live under [`.cursor/plans/`](.cursor/plans/) (e.g. `*.plan.md`).
-- **Commit plans** to git with the feature work (or as soon as the plan is accepted). Do not leave new or updated plans untracked.
-- Keep the plan file in the repo after the feature lands on `main` so history stays auditable. Do not delete plan files unless the user asks.
+- **Always commit plans** to git with the feature work (or as soon as the plan is accepted). Do not leave new or updated plans untracked. A feature commit that omits its plan is incomplete.
+- Keep the plan file in the repo after the feature lands on `main` so history stays auditable.
+- **Never delete** plan files under `.cursor/plans/`. Do not remove them in cleanup, branch switches, merges, or “tidy up” passes. Plans are permanent project history.
 
 ## After the plan
 

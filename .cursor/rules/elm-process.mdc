@@ -12,7 +12,7 @@ The user will request **code in small chunks**. For each **new feature**:
 - Implement **only** that chunk. Do not write ahead (other packages, unused backends, the VS Code extension, CI YAML, extras).
 - Match existing Ada/Alire layout once it exists.
 - After a chunk, stop. Summarize what was added and what is still missing for that chunk.
-- Do not commit or push unless asked. When committing feature work, **include the plan** under `.cursor/plans/` (see `elm-planning`). Network commands: `elm-shell` (grant network, clear proxy env vars).
+- Do not commit or push unless asked. When committing feature work, **always include the plan** under `.cursor/plans/` (see `elm-planning`). Never delete plan files. Network commands: `elm-shell` (grant network, clear proxy env vars).
 
 ## Tests
 
