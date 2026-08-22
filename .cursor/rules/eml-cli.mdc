@@ -9,20 +9,32 @@ The Ada executable is invoked as `eml`. Front-end is chosen from the **input ext
 
 ## Global options
 
-- `--no-color` — plain-text diagnostics and usage on stderr (no ANSI red). Allowed before or after the subcommand.
+- `--no-color` — plain-text diagnostics and usage on stderr (no ANSI color). Allowed before or after the subcommand.
 - `--no-logo` — suppress the startup banner. Allowed before or after the subcommand.
+
+## Shared preprocessor options
+
+On `preproc`, `tokenize`, and `parse`:
+
+- `--var` / `-v $VARNAME=EXPRESSION` — repeatable; `$` required; split on first `=`; empty EXPRESSION is invalid CLI; repeated name is invalid CLI
+- `--warn` / `-w default|none|error` — default is `default` when omitted
+  - `default` — print unused `--var` warnings (yellow stderr); do not stop
+  - `none` — suppress unused `--var` warnings
+  - `error` — treat unused `--var` as error (red stderr); stop before next stage
 
 ## `help`
 
 ```
 eml help
+eml help preproc
 eml help tokenize
 eml help parse
 ```
 
 - `eml help` — usage, command list, and common options on stdout; exit `0`
-- `eml help tokenize` — tokenize-specific usage and options on stdout; exit `0`
-- `eml help parse` — parse-specific usage and options on stdout; exit `0`
+- `eml help preproc` — preproc-specific usage on stdout; exit `0`
+- `eml help tokenize` — tokenize-specific usage on stdout; exit `0`
+- `eml help parse` — parse-specific usage on stdout; exit `0`
 - Unknown topic → stderr error + usage, exit `1`
 - Banner is still printed unless `--no-logo` is set
 
@@ -38,12 +50,35 @@ Commit: <short-hash>
 
 With `--output`/`-o`, the banner still goes to stdout while command output goes only to the file. Without `-o`, stdout is the banner (unless `--no-logo`) then the dump; use `--no-logo` for a pure dump (pipes, tests).
 
-## `tokenize`
+## `preproc`
 
-Dump the token stream. Input is required; output is optional.
+Substitute `$VARNAME` from `--var` bindings and write expanded `.teml` text.
 
 ```
-eml tokenize --input|-i <file.teml> [--output|-o <file.tokens>] [--no-color] [--no-logo]
+eml preproc --input|-i <file.teml> [--output|-o <file.teml>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
+```
+
+- `--input` / `-i` — required; must end in `.teml`
+- `--output` / `-o` — optional; if present must end in `.teml`; if omitted, output goes to stdout
+- Unbound `$VARNAME` — error for **every** occurrence; no output; exit `1`
+- Unused `--var` — warning (or error with `--warn error`)
+- No `$VAR` in file — output equals input (after `Read_File` newline normalization)
+
+Examples:
+
+```
+eml preproc -i filename.teml
+eml preproc -i filename.teml -o other.teml
+eml preproc -i f.teml -v '$X=1+2'
+eml --no-logo preproc -i f.teml -v '$X=1' -w none
+```
+
+## `tokenize`
+
+Run preprocessor, then dump the token stream. Input is required; output is optional.
+
+```
+eml tokenize --input|-i <file.teml> [--output|-o <file.tokens>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
 ```
 
 - `--input` / `-i` — required; must end in `.teml` (this stage; `.eml` tokenize comes later)
@@ -58,16 +93,27 @@ One token per line, no header, no EOF token, no skipped whitespace:
 <line>:<column> <KIND> <lexeme>
 ```
 
-`line` and `column` are 1-based. Invalid tokens are not written to the dump.
+`line` and `column` are 1-based **original** source positions. Around each run
+of tokens from the same substitution occurrence, the dump inserts comment lines
+(not tokens):
+
+```
+-- $VAR1 begin
+1:8 NUMBER 1
+-- $VAR1 end
+```
+
+Invalid tokens are not written to the dump.
 
 ### Errors and exit codes
 
 - Invalid CLI → short error + usage on stderr (red unless `--no-color`), plus a hint to try `eml help`, exit `1`
-- Missing command (e.g. `eml --input f.teml` with no command) → `error: missing command (expected help, tokenize, or parse); got '--input'` (or without `; got …` when no args), exit `1`
-- Lex errors → human-readable lines on stderr (`error: invalid token at line N, column M: …`), continue scanning, still emit valid tokens, exit `1`
+- Missing command → `error: missing command (expected help, preproc, tokenize, or parse); got '…'` (or without `; got …` when no args), exit `1`
+- Preprocess unbound `$VAR` → `error: undefined variable $X at line N, column M` (all occurrences); no dump; exit `1`
+- Unused `--var` → `warning: unused variable $Y` (yellow) or `error: unused variable $Y` with `--warn error`; exit `1` only in error mode
+- Lex errors → `error: invalid token at line N, column M: …` optionally `(from $VAR)`; continue scanning; still emit valid tokens; exit `1`
 - I/O failure → stderr diagnostic, exit `1`
-- Success (zero invalid tokens) → exit `0`
-- `eml help` / `eml help tokenize` → help on stdout, exit `0`
+- Success → exit `0`
 
 Usage text (errors):
 
@@ -75,8 +121,9 @@ Usage text (errors):
 Usage:
   eml <command> [options]
   eml help [command]
-  eml tokenize --input|-i <file.teml> [--output|-o <file.tokens>] [--no-color] [--no-logo]
-  eml parse --input|-i <file.teml> [--output|-o <file>] [--output-format|-of mermaid|md|dot|svg] [--no-color] [--no-logo]
+  eml preproc --input|-i <file.teml> [--output|-o <file.teml>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
+  eml tokenize --input|-i <file.teml> [--output|-o <file.tokens>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
+  eml parse --input|-i <file.teml> [--output|-o <file>] [--output-format|-of mermaid|md|dot|svg] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
 Try 'eml help' for more information.
 ```
 
@@ -84,7 +131,7 @@ Examples:
 
 ```
 eml tokenize --input filename.teml --output other.tokens
-eml tokenize -i filename.teml
+eml tokenize -i filename.teml -v '$X=1'
 eml tokenize --no-logo -i filename.teml -o other.tokens
 ```
 
@@ -92,10 +139,10 @@ eml tokenize --no-logo -i filename.teml -o other.tokens
 
 ## `parse`
 
-Tokenize a `.teml` file, then build a syntax tree with standard mathematical operator precedence and parentheses. Dump the tree.
+Preprocess a `.teml` file, tokenize, then build a syntax tree with standard mathematical operator precedence and parentheses. Dump the tree.
 
 ```
-eml parse --input|-i <file.teml> [--output|-o <file>] [--output-format|-of mermaid|md|dot|svg] [--no-color] [--no-logo]
+eml parse --input|-i <file.teml> [--output|-o <file>] [--output-format|-of mermaid|md|dot|svg] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
 ```
 
 - `--input` / `-i` — required; must end in `.teml` (this stage; `.eml` parse comes later)
@@ -117,7 +164,7 @@ When `-o` is present, the extension **must match** the selected format:
 
 Mismatch is invalid CLI. Without `-o`, the same format is written to stdout.
 
-Pipeline: read file → tokenize → if lex errors, report and stop (no tree) → parse → if parse error, report and stop (no tree) → emit.
+Pipeline: read file → preprocess → if unbound or `--warn error` unused, report and stop → tokenize → if lex errors, report and stop (no tree) → parse → if parse error, report and stop (no tree) → emit.
 
 Parse errors stop at the first error:
 
@@ -125,7 +172,9 @@ Parse errors stop at the first error:
 error: parse error at line <line>, column <column>: <reason>
 ```
 
-Exit `0` on success; `1` on invalid CLI, I/O, lex, or parse errors.
+Optionally append `(from $VARNAME)` when the error location comes from substituted text.
+
+Exit `0` on success; `1` on invalid CLI, I/O, preprocess, lex, or parse errors.
 
 `eml help parse` — parse-specific usage on stdout; exit `0`.
 
@@ -137,6 +186,7 @@ Examples:
 eml parse -i filename.teml
 eml parse -i filename.teml -o other.syntaxtree
 eml parse -i filename.teml -o other.md -of md
+eml parse -i f.teml -v '$X=1' -w none
 eml parse --no-logo -i filename.teml -of svg -o other.svg
 ```
 

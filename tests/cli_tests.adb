@@ -67,7 +67,11 @@ package body CLI_Tests is
             A ("-i"),
             A (In_Path),
             A ("-o"),
-            A (Out_Path)];
+            A (Out_Path),
+            A ("-v"),
+            A ("$X=1"),
+            A ("-w"),
+            A ("none")];
          Status   : constant Ada.Command_Line.Exit_Status :=
            Eml.CLI.Run (Args);
          Expected : constant String :=
@@ -79,7 +83,11 @@ package body CLI_Tests is
            & ASCII.LF
            & "1:7 PLUS +"
            & ASCII.LF
-           & "1:8 VARIABLE $X"
+           & "-- $X begin"
+           & ASCII.LF
+           & "1:8 NUMBER 1"
+           & ASCII.LF
+           & "-- $X end"
            & ASCII.LF
            & "1:10 RPAREN )";
       begin
@@ -493,6 +501,145 @@ package body CLI_Tests is
       begin
          Require
            (Status = Ada.Command_Line.Failure, "cli-missing-cmd: exit");
+      end;
+
+      declare
+         In_Path  : constant String :=
+           Write_Temp ("cli_preproc_id.teml", "1+2");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_preproc_id.teml");
+         Args     : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("preproc"),
+            A ("-i"),
+            A (In_Path),
+            A ("-o"),
+            A (Out_Path)];
+         Status   : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require (Status = Ada.Command_Line.Success, "cli-preproc-id: exit");
+         Require (Read_All (Out_Path) = "1+2", "cli-preproc-id: text");
+      end;
+
+      declare
+         In_Path  : constant String := Write_Temp ("cli_preproc_x.teml", "$X");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_preproc_x.teml");
+         Args     : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("preproc"),
+            A ("-i"),
+            A (In_Path),
+            A ("-o"),
+            A (Out_Path),
+            A ("-v"),
+            A ("$X=1+2")];
+         Status   : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require (Status = Ada.Command_Line.Success, "cli-preproc-x: exit");
+         Require (Read_All (Out_Path) = "1+2", "cli-preproc-x: text");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_unbound.teml", "$X");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_unbound.teml");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("preproc"),
+            A ("-i"),
+            A (In_Path),
+            A ("-o"),
+            A (Out_Path)];
+         Status  : Ada.Command_Line.Exit_Status;
+      begin
+         if Ada.Directories.Exists (Out_Path) then
+            Ada.Directories.Delete_File (Out_Path);
+         end if;
+         Status := Eml.CLI.Run (Args);
+         Require (Status = Ada.Command_Line.Failure, "cli-unbound: exit");
+         Require
+           (not Ada.Directories.Exists (Out_Path),
+            "cli-unbound: no file");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_warn_err.teml", "1");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_warn_err.tokens");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("tokenize"),
+            A ("-i"),
+            A (In_Path),
+            A ("-o"),
+            A (Out_Path),
+            A ("-v"),
+            A ("$Y=9"),
+            A ("-w"),
+            A ("error")];
+         Status  : Ada.Command_Line.Exit_Status;
+      begin
+         if Ada.Directories.Exists (Out_Path) then
+            Ada.Directories.Delete_File (Out_Path);
+         end if;
+         Status := Eml.CLI.Run (Args);
+         Require (Status = Ada.Command_Line.Failure, "cli-warn-err: exit");
+         Require
+           (not Ada.Directories.Exists (Out_Path),
+            "cli-warn-err: no file");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_warn_bad.teml", "1");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("tokenize"),
+            A ("-i"),
+            A (In_Path),
+            A ("-w"),
+            A ("all")];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure, "cli-warn-bad: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_preproc_badext.teml", "1");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("preproc"),
+            A ("-i"),
+            A (In_Path),
+            A ("-o"),
+            A ("out.tokens")];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure, "cli-preproc-badext: exit");
+      end;
+
+      declare
+         Args   : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"), A ("help"), A ("preproc")];
+         Status : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Success, "cli-help-preproc: exit");
       end;
    end Run;
 

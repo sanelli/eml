@@ -1,6 +1,7 @@
 with Ada.Strings.Unbounded;
 with Ada.Text_IO;
 
+with Expr_Preprocessor;
 with Expr_Tokenizer;
 
 package body Expr_Tokenizer_Tests is
@@ -82,7 +83,7 @@ package body Expr_Tokenizer_Tests is
       end;
 
       declare
-         R : constant Tokenize_Result := Tokenize ("sin(pi+$X)");
+         R : constant Tokenize_Result := Tokenize ("sin(pi+1)");
       begin
          Require (not R.Had_Errors, "sin: no errors");
          Require (R.Tokens'Length = 6, "sin: count");
@@ -97,10 +98,10 @@ package body Expr_Tokenizer_Tests is
          Require
            (Format_Dump (R.Tokens (4)) = "1:7 PLUS +", "sin-dump-4");
          Require
-           (Format_Dump (R.Tokens (5)) = "1:8 VARIABLE $X",
+           (Format_Dump (R.Tokens (5)) = "1:8 NUMBER 1",
             "sin-dump-5");
          Require
-           (Format_Dump (R.Tokens (6)) = "1:10 RPAREN )", "sin-dump-6");
+           (Format_Dump (R.Tokens (6)) = "1:9 RPAREN )", "sin-dump-6");
       end;
 
       declare
@@ -113,11 +114,19 @@ package body Expr_Tokenizer_Tests is
       end;
 
       declare
-         R : constant Tokenize_Result := Tokenize ("$VAR1");
+         R : constant Tokenize_Result := Tokenize ("$X");
       begin
-         Require (not R.Had_Errors, "var: no errors");
-         Require_Token
-           (R.Tokens (1), Variable, "$VAR1", 1, 1, "var");
+         Require (R.Had_Errors, "dollar: error");
+         Require (R.Tokens'Length = 0, "dollar: no valid tokens");
+         Require (R.Diagnostics'Length >= 1, "dollar: diag count");
+         if R.Diagnostics'Length >= 1 then
+            Require (R.Diagnostics (1).Line = 1, "dollar: diag line");
+            Require (R.Diagnostics (1).Column = 1, "dollar: diag column");
+            Require
+              (To_String (R.Diagnostics (1).Message)
+               = "unexpected character '$'",
+               "dollar: diag message");
+         end if;
       end;
 
       declare
@@ -223,6 +232,46 @@ package body Expr_Tokenizer_Tests is
          R : constant Tokenize_Result := Tokenize (",");
       begin
          Require (R.Had_Errors, "comma: error");
+      end;
+
+      declare
+         B : constant Expr_Preprocessor.Binding_Array :=
+           [1 =>
+              (Name  => To_Unbounded_String ("$X"),
+               Value => To_Unbounded_String ("1"))];
+         Prep : constant Expr_Preprocessor.Preprocess_Result :=
+           Expr_Preprocessor.Preprocess ("sin(pi+$X)", B);
+         R    : constant Tokenize_Result :=
+           Tokenize (To_String (Prep.Text), Prep.Origins);
+      begin
+         Require (not R.Had_Errors, "preproc-tok: no errors");
+         Require (R.Tokens'Length = 6, "preproc-tok: count");
+         Require
+           (Format_Dump (R.Tokens (5)) = "1:8 NUMBER 1",
+            "preproc-tok: substituted");
+         Require (R.Tokens (5).From_Var, "preproc-tok: from-var");
+      end;
+
+      declare
+         B : constant Expr_Preprocessor.Binding_Array :=
+           [1 =>
+              (Name  => To_Unbounded_String ("$Y"),
+               Value => To_Unbounded_String ("@"))];
+         Prep : constant Expr_Preprocessor.Preprocess_Result :=
+           Expr_Preprocessor.Preprocess ("$Y", B);
+         R    : constant Tokenize_Result :=
+           Tokenize (To_String (Prep.Text), Prep.Origins);
+      begin
+         Require (R.Had_Errors, "var-lex: error");
+         Require (R.Diagnostics'Length = 1, "var-lex: diag count");
+         Require (R.Diagnostics (1).From_Var, "var-lex: from-var");
+         Require
+           (To_String (R.Diagnostics (1).Var_Name) = "$Y",
+            "var-lex: var-name");
+         Require
+           (To_String (R.Diagnostics (1).Message)
+            = "unexpected character '@'",
+            "var-lex: message");
       end;
    end Run;
 

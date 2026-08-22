@@ -4,6 +4,7 @@ with Ada.Text_IO;
 with CLI_Tests;
 with Eml_Parser;
 with Eml_Tokenizer;
+with Expr_Preprocessor_Tests;
 with Expr_Parser_Tests;
 with Expr_Tokenizer_Tests;
 with Interpreter;
@@ -24,6 +25,7 @@ procedure Eml_Tests is
 
 begin
    Regex_Automata_Tests.Run (Failed);
+   Expr_Preprocessor_Tests.Run (Failed);
    Expr_Tokenizer_Tests.Run (Failed);
    Expr_Parser_Tests.Run (Failed);
    CLI_Tests.Run (Failed);

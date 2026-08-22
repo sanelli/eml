@@ -10,8 +10,6 @@ package body Expr_Tokenizer is
      Regex_Automata.Compile ("[0-9]+(\.[0-9]+)?([eE][+\-]?[0-9]+)?");
    Word_Pat : constant Regex_Automata.Engine :=
      Regex_Automata.Compile ("[A-Za-z][A-Za-z0-9]*");
-   Variable_Pat : constant Regex_Automata.Engine :=
-     Regex_Automata.Compile ("\$[A-Za-z_][A-Za-z0-9_]*");
    Plus_Pat : constant Regex_Automata.Engine :=
      Regex_Automata.Compile ("\+");
    Minus_Pat : constant Regex_Automata.Engine :=
@@ -50,8 +48,6 @@ package body Expr_Tokenizer is
             return "FUNCTION";
          when Constant_Name =>
             return "CONSTANT";
-         when Variable =>
-            return "VARIABLE";
       end case;
    end Kind_Name;
 
@@ -94,11 +90,29 @@ package body Expr_Tokenizer is
       end loop;
    end Advance_Position;
 
-   function Tokenize (Source : String) return Tokenize_Result is
-      Tokens_Cap : Natural := 16;
-      Diags_Cap  : Natural := 8;
-      Tokens_Buf : Token_Buffer_Access := new Token_Buffer (1 .. Tokens_Cap);
-      Diags_Buf  : Diag_Buffer_Access := new Diag_Buffer (1 .. Diags_Cap);
+   function Origin_At
+     (Origins : Origin_Map_Access; Pos : Positive) return Origin
+   is
+   begin
+      if Origins = null then
+         return
+           (Line     => 1,
+            Column   => 1,
+            From_Var => False,
+            Var_Name => Null_Unbounded_String);
+      else
+         return Origins (Pos);
+      end if;
+   end Origin_At;
+
+   function Tokenize_Internal
+     (Source  : String;
+      Origins : Origin_Map_Access) return Tokenize_Result
+   is
+      Tokens_Cap  : Natural := 16;
+      Diags_Cap   : Natural := 8;
+      Tokens_Buf  : Token_Buffer_Access := new Token_Buffer (1 .. Tokens_Cap);
+      Diags_Buf   : Diag_Buffer_Access := new Diag_Buffer (1 .. Diags_Cap);
       Token_Count : Natural := 0;
       Diag_Count  : Natural := 0;
       Pos         : Positive := Source'First;
@@ -106,6 +120,7 @@ package body Expr_Tokenizer is
       Column      : Positive := 1;
       Result      : Tokenize_Result;
       Had_Errors  : Boolean := False;
+      Use_Origins : constant Boolean := Origins /= null;
 
       procedure Grow_Tokens is
          New_Cap : constant Natural := Tokens_Cap * 2;
@@ -128,7 +143,11 @@ package body Expr_Tokenizer is
       end Grow_Diags;
 
       procedure Emit_Token
-        (Kind : Token_Kind; Lex : String; L, C : Positive)
+        (Kind : Token_Kind;
+         Lex  : String;
+         L, C : Positive;
+         From_Var : Boolean;
+         Var      : Unbounded_String)
       is
       begin
          if Token_Count = Tokens_Cap then
@@ -136,13 +155,20 @@ package body Expr_Tokenizer is
          end if;
          Token_Count := Token_Count + 1;
          Tokens_Buf (Token_Count) :=
-           (Kind   => Kind,
-            Lexeme => To_Unbounded_String (Lex),
-            Line   => L,
-            Column => C);
+           (Kind     => Kind,
+            Lexeme   => To_Unbounded_String (Lex),
+            Line     => L,
+            Column   => C,
+            From_Var => From_Var,
+            Var_Name => Var);
       end Emit_Token;
 
-      procedure Emit_Diag (L, C : Positive; Message : String) is
+      procedure Emit_Diag
+        (L, C : Positive;
+         Message : String;
+         From_Var : Boolean;
+         Var      : Unbounded_String)
+      is
       begin
          Had_Errors := True;
          if Diag_Count = Diags_Cap then
@@ -150,9 +176,11 @@ package body Expr_Tokenizer is
          end if;
          Diag_Count := Diag_Count + 1;
          Diags_Buf (Diag_Count) :=
-           (Line    => L,
-            Column  => C,
-            Message => To_Unbounded_String (Message));
+           (Line     => L,
+            Column   => C,
+            Message  => To_Unbounded_String (Message),
+            From_Var => From_Var,
+            Var_Name => Var);
       end Emit_Diag;
 
       function Match
@@ -170,10 +198,18 @@ package body Expr_Tokenizer is
 
       while Pos <= Source'Last loop
          declare
-            Start_Line   : constant Positive := Line;
-            Start_Column : constant Positive := Column;
+            Start_Pos    : constant Positive := Pos;
+            Start_Line   : Positive := Line;
+            Start_Column : Positive := Column;
             Len          : Natural;
+            Orig         : Origin;
          begin
+            if Use_Origins then
+               Orig := Origin_At (Origins, Start_Pos);
+               Start_Line := Orig.Line;
+               Start_Column := Orig.Column;
+            end if;
+
             Len := Match (Whitespace, Pos);
             if Len > 0 then
                Advance_Position (Source, Pos, Len, Line, Column);
@@ -181,88 +217,172 @@ package body Expr_Tokenizer is
             else
                Len := Match (Number_Pat, Pos);
                if Len > 0 then
+                  if Use_Origins then
+                     Orig := Origin_At (Origins, Start_Pos);
+                  end if;
                   Emit_Token
-                    (Number, Source (Pos .. Pos + Len - 1),
-                     Start_Line, Start_Column);
+                    (Number,
+                     Source (Pos .. Pos + Len - 1),
+                     Start_Line,
+                     Start_Column,
+                     (if Use_Origins then Orig.From_Var else False),
+                     (if Use_Origins then Orig.Var_Name
+                      else Null_Unbounded_String));
                   Advance_Position (Source, Pos, Len, Line, Column);
                   Pos := Pos + Len;
                else
-                  Len := Match (Variable_Pat, Pos);
+                  Len := Match (Word_Pat, Pos);
                   if Len > 0 then
-                     Emit_Token
-                       (Variable, Source (Pos .. Pos + Len - 1),
-                        Start_Line, Start_Column);
-                     Advance_Position (Source, Pos, Len, Line, Column);
-                     Pos := Pos + Len;
-                  else
-                     Len := Match (Word_Pat, Pos);
-                     if Len > 0 then
-                        declare
-                           Word : constant String :=
-                             Source (Pos .. Pos + Len - 1);
-                        begin
-                           if Is_Function (Word) then
-                              Emit_Token
-                                (Function_Name, Word,
-                                 Start_Line, Start_Column);
-                           elsif Is_Constant (Word) then
-                              Emit_Token
-                                (Constant_Name, Word,
-                                 Start_Line, Start_Column);
-                           else
-                              Emit_Diag
-                                (Start_Line,
-                                 Start_Column,
-                                 "unknown identifier '" & Word & "'");
-                           end if;
-                           Advance_Position (Source, Pos, Len, Line, Column);
-                           Pos := Pos + Len;
-                        end;
-                     elsif Match (Plus_Pat, Pos) > 0 then
-                        Emit_Token
-                          (Plus, "+", Start_Line, Start_Column);
-                        Advance_Position (Source, Pos, 1, Line, Column);
-                        Pos := Pos + 1;
-                     elsif Match (Minus_Pat, Pos) > 0 then
-                        Emit_Token
-                          (Minus, "-", Start_Line, Start_Column);
-                        Advance_Position (Source, Pos, 1, Line, Column);
-                        Pos := Pos + 1;
-                     elsif Match (Star_Pat, Pos) > 0 then
-                        Emit_Token
-                          (Star, "*", Start_Line, Start_Column);
-                        Advance_Position (Source, Pos, 1, Line, Column);
-                        Pos := Pos + 1;
-                     elsif Match (Slash_Pat, Pos) > 0 then
-                        Emit_Token
-                          (Slash, "/", Start_Line, Start_Column);
-                        Advance_Position (Source, Pos, 1, Line, Column);
-                        Pos := Pos + 1;
-                     elsif Match (Caret_Pat, Pos) > 0 then
-                        Emit_Token
-                          (Caret, "^", Start_Line, Start_Column);
-                        Advance_Position (Source, Pos, 1, Line, Column);
-                        Pos := Pos + 1;
-                     elsif Match (LParen_Pat, Pos) > 0 then
-                        Emit_Token
-                          (LParen, "(", Start_Line, Start_Column);
-                        Advance_Position (Source, Pos, 1, Line, Column);
-                        Pos := Pos + 1;
-                     elsif Match (RParen_Pat, Pos) > 0 then
-                        Emit_Token
-                          (RParen, ")", Start_Line, Start_Column);
-                        Advance_Position (Source, Pos, 1, Line, Column);
-                        Pos := Pos + 1;
-                     else
-                        Emit_Diag
-                          (Start_Line,
-                           Start_Column,
-                           "unexpected character '"
-                           & Source (Pos .. Pos)
-                           & "'");
-                        Advance_Position (Source, Pos, 1, Line, Column);
-                        Pos := Pos + 1;
+                     declare
+                        Word : constant String :=
+                          Source (Pos .. Pos + Len - 1);
+                     begin
+                        if Use_Origins then
+                           Orig := Origin_At (Origins, Start_Pos);
+                        end if;
+                        if Is_Function (Word) then
+                           Emit_Token
+                             (Function_Name,
+                              Word,
+                              Start_Line,
+                              Start_Column,
+                              (if Use_Origins then Orig.From_Var else False),
+                              (if Use_Origins then Orig.Var_Name
+                               else Null_Unbounded_String));
+                        elsif Is_Constant (Word) then
+                           Emit_Token
+                             (Constant_Name,
+                              Word,
+                              Start_Line,
+                              Start_Column,
+                              (if Use_Origins then Orig.From_Var else False),
+                              (if Use_Origins then Orig.Var_Name
+                               else Null_Unbounded_String));
+                        else
+                           Emit_Diag
+                             (Start_Line,
+                              Start_Column,
+                              "unknown identifier '" & Word & "'",
+                              (if Use_Origins then Orig.From_Var else False),
+                              (if Use_Origins then Orig.Var_Name
+                               else Null_Unbounded_String));
+                        end if;
+                        Advance_Position (Source, Pos, Len, Line, Column);
+                        Pos := Pos + Len;
+                     end;
+                  elsif Match (Plus_Pat, Pos) > 0 then
+                     if Use_Origins then
+                        Orig := Origin_At (Origins, Start_Pos);
                      end if;
+                     Emit_Token
+                       (Plus,
+                        "+",
+                        Start_Line,
+                        Start_Column,
+                        (if Use_Origins then Orig.From_Var else False),
+                        (if Use_Origins then Orig.Var_Name
+                         else Null_Unbounded_String));
+                     Advance_Position (Source, Pos, 1, Line, Column);
+                     Pos := Pos + 1;
+                  elsif Match (Minus_Pat, Pos) > 0 then
+                     if Use_Origins then
+                        Orig := Origin_At (Origins, Start_Pos);
+                     end if;
+                     Emit_Token
+                       (Minus,
+                        "-",
+                        Start_Line,
+                        Start_Column,
+                        (if Use_Origins then Orig.From_Var else False),
+                        (if Use_Origins then Orig.Var_Name
+                         else Null_Unbounded_String));
+                     Advance_Position (Source, Pos, 1, Line, Column);
+                     Pos := Pos + 1;
+                  elsif Match (Star_Pat, Pos) > 0 then
+                     if Use_Origins then
+                        Orig := Origin_At (Origins, Start_Pos);
+                     end if;
+                     Emit_Token
+                       (Star,
+                        "*",
+                        Start_Line,
+                        Start_Column,
+                        (if Use_Origins then Orig.From_Var else False),
+                        (if Use_Origins then Orig.Var_Name
+                         else Null_Unbounded_String));
+                     Advance_Position (Source, Pos, 1, Line, Column);
+                     Pos := Pos + 1;
+                  elsif Match (Slash_Pat, Pos) > 0 then
+                     if Use_Origins then
+                        Orig := Origin_At (Origins, Start_Pos);
+                     end if;
+                     Emit_Token
+                       (Slash,
+                        "/",
+                        Start_Line,
+                        Start_Column,
+                        (if Use_Origins then Orig.From_Var else False),
+                        (if Use_Origins then Orig.Var_Name
+                         else Null_Unbounded_String));
+                     Advance_Position (Source, Pos, 1, Line, Column);
+                     Pos := Pos + 1;
+                  elsif Match (Caret_Pat, Pos) > 0 then
+                     if Use_Origins then
+                        Orig := Origin_At (Origins, Start_Pos);
+                     end if;
+                     Emit_Token
+                       (Caret,
+                        "^",
+                        Start_Line,
+                        Start_Column,
+                        (if Use_Origins then Orig.From_Var else False),
+                        (if Use_Origins then Orig.Var_Name
+                         else Null_Unbounded_String));
+                     Advance_Position (Source, Pos, 1, Line, Column);
+                     Pos := Pos + 1;
+                  elsif Match (LParen_Pat, Pos) > 0 then
+                     if Use_Origins then
+                        Orig := Origin_At (Origins, Start_Pos);
+                     end if;
+                     Emit_Token
+                       (LParen,
+                        "(",
+                        Start_Line,
+                        Start_Column,
+                        (if Use_Origins then Orig.From_Var else False),
+                        (if Use_Origins then Orig.Var_Name
+                         else Null_Unbounded_String));
+                     Advance_Position (Source, Pos, 1, Line, Column);
+                     Pos := Pos + 1;
+                  elsif Match (RParen_Pat, Pos) > 0 then
+                     if Use_Origins then
+                        Orig := Origin_At (Origins, Start_Pos);
+                     end if;
+                     Emit_Token
+                       (RParen,
+                        ")",
+                        Start_Line,
+                        Start_Column,
+                        (if Use_Origins then Orig.From_Var else False),
+                        (if Use_Origins then Orig.Var_Name
+                         else Null_Unbounded_String));
+                     Advance_Position (Source, Pos, 1, Line, Column);
+                     Pos := Pos + 1;
+                  else
+                     if Use_Origins then
+                        Orig := Origin_At (Origins, Start_Pos);
+                     end if;
+                     Emit_Diag
+                       (Start_Line,
+                        Start_Column,
+                        "unexpected character '"
+                        & Source (Pos .. Pos)
+                        & "'",
+                        (if Use_Origins then Orig.From_Var else False),
+                        (if Use_Origins then Orig.Var_Name
+                         else Null_Unbounded_String));
+                     Advance_Position (Source, Pos, 1, Line, Column);
+                     Pos := Pos + 1;
                   end if;
                end if;
             end if;
@@ -279,6 +399,19 @@ package body Expr_Tokenizer is
       end loop;
       Result.Had_Errors := Had_Errors;
       return Result;
+   end Tokenize_Internal;
+
+   function Tokenize (Source : String) return Tokenize_Result is
+   begin
+      return Tokenize_Internal (Source, null);
+   end Tokenize;
+
+   function Tokenize
+     (Source  : String;
+      Origins : Origin_Map_Access) return Tokenize_Result
+   is
+   begin
+      return Tokenize_Internal (Source, Origins);
    end Tokenize;
 
    function Trim_Image (N : Positive) return String is
@@ -289,6 +422,15 @@ package body Expr_Tokenizer is
       end if;
       return S;
    end Trim_Image;
+
+   function Same_Var_Span (A, B : Token) return Boolean is
+   begin
+      return A.From_Var
+        and then B.From_Var
+        and then A.Line = B.Line
+        and then A.Column = B.Column
+        and then A.Var_Name = B.Var_Name;
+   end Same_Var_Span;
 
    procedure Write_One
      (File : Ada.Text_IO.File_Type; T : Token)
@@ -309,10 +451,40 @@ package body Expr_Tokenizer is
      (Tokens : Token_Array;
       File   : Ada.Text_IO.File_Type)
    is
+      In_Var_Run : Boolean := False;
+      Run_Var    : Unbounded_String;
    begin
-      for T of Tokens loop
-         Write_One (File, T);
+      for I in Tokens'Range loop
+         declare
+            T : constant Token := Tokens (I);
+         begin
+            if T.From_Var then
+               if not In_Var_Run
+                 or else (I > Tokens'First
+                          and then not Same_Var_Span (Tokens (I - 1), T))
+               then
+                  if In_Var_Run then
+                     Ada.Text_IO.Put_Line
+                       (File, "-- " & To_String (Run_Var) & " end");
+                  end if;
+                  Ada.Text_IO.Put_Line
+                    (File, "-- " & To_String (T.Var_Name) & " begin");
+                  In_Var_Run := True;
+                  Run_Var := T.Var_Name;
+               end if;
+            else
+               if In_Var_Run then
+                  Ada.Text_IO.Put_Line
+                    (File, "-- " & To_String (Run_Var) & " end");
+                  In_Var_Run := False;
+               end if;
+            end if;
+            Write_One (File, T);
+         end;
       end loop;
+      if In_Var_Run then
+         Ada.Text_IO.Put_Line (File, "-- " & To_String (Run_Var) & " end");
+      end if;
    end Write_Dump;
 
    procedure Write_Dump_To_Stdout (Tokens : Token_Array) is

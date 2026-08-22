@@ -14,14 +14,26 @@ package Expr_Tokenizer is
       RParen,
       Number,
       Function_Name,
-      Constant_Name,
-      Variable);
+      Constant_Name);
+
+   type Origin is record
+      Line     : Positive := 1;
+      Column   : Positive := 1;
+      From_Var : Boolean := False;
+      Var_Name : Ada.Strings.Unbounded.Unbounded_String;
+   end record;
+
+   type Origin_Map is array (Positive range <>) of Origin;
+
+   type Origin_Map_Access is access Origin_Map;
 
    type Token is record
-      Kind   : Token_Kind;
-      Lexeme : Ada.Strings.Unbounded.Unbounded_String;
-      Line   : Positive := 1;
-      Column : Positive := 1;
+      Kind     : Token_Kind;
+      Lexeme   : Ada.Strings.Unbounded.Unbounded_String;
+      Line     : Positive := 1;
+      Column   : Positive := 1;
+      From_Var : Boolean := False;
+      Var_Name : Ada.Strings.Unbounded.Unbounded_String;
    end record;
 
    type Token_Array is array (Positive range <>) of Token;
@@ -29,9 +41,11 @@ package Expr_Tokenizer is
    type Token_Array_Access is access Token_Array;
 
    type Diagnostic is record
-      Line    : Positive := 1;
-      Column  : Positive := 1;
-      Message : Ada.Strings.Unbounded.Unbounded_String;
+      Line     : Positive := 1;
+      Column   : Positive := 1;
+      Message  : Ada.Strings.Unbounded.Unbounded_String;
+      From_Var : Boolean := False;
+      Var_Name : Ada.Strings.Unbounded.Unbounded_String;
    end record;
 
    type Diagnostic_Array is array (Positive range <>) of Diagnostic;
@@ -39,17 +53,22 @@ package Expr_Tokenizer is
    type Diagnostic_Array_Access is access Diagnostic_Array;
 
    type Tokenize_Result is record
-      Tokens       : Token_Array_Access := null;
-      Diagnostics  : Diagnostic_Array_Access := null;
-      Had_Errors   : Boolean := False;
+      Tokens      : Token_Array_Access := null;
+      Diagnostics : Diagnostic_Array_Access := null;
+      Had_Errors  : Boolean := False;
    end record;
 
    function Kind_Name (Kind : Token_Kind) return String;
    --  Stable uppercase dump name for Kind.
 
    function Tokenize (Source : String) return Tokenize_Result;
-   --  Scan Source. Invalid tokens become diagnostics; scanning continues.
-   --  Only valid tokens are returned in Tokens.
+   --  Scan Source without an origin map (positions from the scan).
+
+   function Tokenize
+     (Source  : String;
+      Origins : Origin_Map_Access) return Tokenize_Result;
+   --  Scan preprocessed Source; positions and var provenance come from
+   --  Origins (one entry per character of Source).
 
    procedure Write_Dump
      (Tokens : Token_Array;

@@ -9,7 +9,6 @@ package Expr_Parser is
    type Node_Kind is
      (Number_Node,
       Constant_Node,
-      Variable_Node,
       UPlus_Node,
       UMinus_Node,
       Add_Node,
@@ -40,6 +39,8 @@ package Expr_Parser is
       Error_Line : Positive := 1;
       Error_Col  : Positive := 1;
       Message    : Ada.Strings.Unbounded.Unbounded_String;
+      From_Var   : Boolean := False;
+      Var_Name   : Ada.Strings.Unbounded.Unbounded_String;
    end record;
 
    function Parse (Tokens : Expr_Tokenizer.Token_Array) return Parse_Result;

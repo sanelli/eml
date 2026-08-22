@@ -21,7 +21,7 @@ Parentheses change structure only (they are not syntax-tree nodes). One expressi
 
 | Level | Forms | Associativity |
 |---|---|---|
-| Primary | number, constant, `$VAR`, `(e)`, `func(e)` | n/a |
+| Primary | number, constant, `(e)`, `func(e)` | n/a |
 | Unary | prefix `+` `-` | right |
 | Power | `^` | right |
 | Mul | `*` `/` | left |
@@ -38,9 +38,16 @@ Examples: `1+2*3` is add(1, mul(2, 3)); `2^3^2` is pow(2, pow(3, 2)); `-2^2` is 
 - `e`
 - `phi` (golden ratio)
 
-## Variables
+## Variables (preprocessor)
 
-Variables are `$VARNAME`. On `eml run`, bind them as `$NAME:VALUE` (example: `$VAR1:1.345 $VAR2:i $VAR3:e $VAR4:99`). `VALUE` uses the same constant forms as the source language.
+`$VARNAME` is **preprocessor syntax**, not a tokenizer or parser token. Bindings
+are supplied on the CLI as `--var $NAME=EXPRESSION` (or `-v`) on `preproc`,
+`tokenize`, and `parse`. EXPRESSION is pasted textually into the source before
+tokenization. Unbound `$VARNAME` in the file is an error (every occurrence
+reported). Unused `--var` bindings emit warnings unless `--warn none`.
+
+After preprocessing, the expression language has no `$VAR` tokens. On future
+`eml run`, bindings may use a separate `$NAME:VALUE` form (not implemented yet).
 
 ## Out of scope until requested
 

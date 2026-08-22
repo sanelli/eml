@@ -3,10 +3,10 @@
 # Usage:
 #   pwsh -File scripts/run_samples.ps1
 #   pwsh -File scripts/run_samples.ps1 -Operations tokenize
-#   pwsh -File scripts/run_samples.ps1 -Operations tokenize,parse
+#   pwsh -File scripts/run_samples.ps1 -Operations tokenize,parse,preproc
 #   pwsh -File scripts/run_samples.ps1 --operations tokenize parse
 #
-# -Operations / --operations: one or more of tokenize, parse.
+# -Operations / --operations: one or more of preproc, tokenize, parse.
 # If omitted (or empty), all operations are run.
 #
 # Results are written under .results/<operation>/. Exit 0 if every sample
@@ -29,7 +29,19 @@ $ErrorActionPreference = "Continue"
 $Root = Split-Path -Parent $PSScriptRoot
 $SamplesDir = Join-Path $Root "samples"
 $Eml = Join-Path $Root "bin" "eml"
-$AllOperations = @("tokenize", "parse")
+$AllOperations = @("preproc", "tokenize", "parse")
+
+# Dummy bindings for parameterized samples; --warn none suppresses unused warnings.
+$SampleVarArgs = @(
+    "-v", '$X=1',
+    "-v", '$A=1',
+    "-v", '$B=1',
+    "-v", '$R=1',
+    "-v", '$M=1',
+    "-v", '$C=1',
+    "-v", '$THETA=1',
+    "-w", "none"
+)
 
 function Expand-OperationList {
     param([string[]] $Items)
@@ -75,8 +87,6 @@ while ($i -lt $RemainingArguments.Count) {
         continue
     }
 
-    # PowerShell may bind `--operations tokenize parse` as Operations=tokenize
-    # plus Remaining=parse; accept trailing bare operation names in that case.
     if ($Arg -notmatch '^-' -and $Collected.Count -gt 0) {
         [void]$Collected.Add($Arg)
         $i++
@@ -112,6 +122,30 @@ if ($Samples.Count -eq 0) {
 
 $Failed = 0
 
+function Invoke-PreprocSamples {
+    param(
+        [System.IO.FileInfo[]] $SampleList,
+        [string] $ResultsDir
+    )
+
+    $LocalFailed = 0
+    New-Item -ItemType Directory -Force -Path $ResultsDir | Out-Null
+
+    foreach ($Sample in $SampleList) {
+        $OutName = $Sample.Name
+        $OutPath = Join-Path $ResultsDir $OutName
+        Write-Host "preproc $($Sample.Name) -> .results/preproc/$OutName"
+
+        & $script:Eml --no-logo --no-color preproc -i $Sample.FullName @SampleVarArgs -o $OutPath
+        $Code = $LASTEXITCODE
+        if ($Code -ne 0) {
+            Write-Host "FAIL: $($Sample.Name) (exit $Code)"
+            $LocalFailed = 1
+        }
+    }
+    return $LocalFailed
+}
+
 function Invoke-TokenizeSamples {
     param(
         [System.IO.FileInfo[]] $SampleList,
@@ -126,7 +160,7 @@ function Invoke-TokenizeSamples {
         $OutPath = Join-Path $ResultsDir $OutName
         Write-Host "tokenize $($Sample.Name) -> .results/tokenize/$OutName"
 
-        & $script:Eml --no-logo --no-color tokenize -i $Sample.FullName -o $OutPath
+        & $script:Eml --no-logo --no-color tokenize -i $Sample.FullName @SampleVarArgs -o $OutPath
         $Code = $LASTEXITCODE
         if ($Code -ne 0) {
             Write-Host "FAIL: $($Sample.Name) (exit $Code)"
@@ -155,7 +189,7 @@ function Invoke-ParseAllFormats {
         $OutPath = Join-Path $ResultsDir $OutName
         Write-Host "parse $($Sample.Name) -of $($Fmt.Of) -> .results/parse/$OutName"
 
-        & $script:Eml --no-logo --no-color parse -i $Sample.FullName -of $Fmt.Of -o $OutPath
+        & $script:Eml --no-logo --no-color parse -i $Sample.FullName @SampleVarArgs -of $Fmt.Of -o $OutPath
         $Code = $LASTEXITCODE
         if ($Code -ne 0) {
             Write-Host "FAIL: $($Sample.Name) format $($Fmt.Of) (exit $Code)"
@@ -187,7 +221,10 @@ foreach ($Op in $Operations) {
     $ResultsDir = Join-Path $Root ".results" $Op
     Write-Host "=== operation: $Op ==="
 
-    if ($Op -eq "tokenize") {
+    if ($Op -eq "preproc") {
+        $Code = Invoke-PreprocSamples -SampleList $Samples -ResultsDir $ResultsDir
+    }
+    elseif ($Op -eq "tokenize") {
         $Code = Invoke-TokenizeSamples -SampleList $Samples -ResultsDir $ResultsDir
     }
     elseif ($Op -eq "parse") {

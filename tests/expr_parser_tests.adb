@@ -2,6 +2,7 @@ with Ada.Strings.Fixed;
 with Ada.Strings.Unbounded;
 with Ada.Text_IO;
 
+with Expr_Preprocessor;
 with Expr_Parser;
 with Expr_Tokenizer;
 
@@ -135,7 +136,7 @@ package body Expr_Parser_Tests is
 
       declare
          R : constant Expr_Parser.Parse_Result :=
-           Parse_Source ("sin(pi+$X)");
+           Parse_Source ("sin(pi+1)");
       begin
          Require (not R.Had_Error, "call: ok");
          Require_Kind (R.Root, Expr_Parser.Call_Node, "call-root");
@@ -146,7 +147,7 @@ package body Expr_Parser_Tests is
       end;
 
       declare
-         R : constant Expr_Parser.Parse_Result := Parse_Source ("e^(-$X)");
+         R : constant Expr_Parser.Parse_Result := Parse_Source ("e^(-1)");
       begin
          Require (not R.Had_Error, "exp-neg: ok");
          Require_Kind (R.Root, Expr_Parser.Pow_Node, "exp-neg-root");
@@ -220,6 +221,27 @@ package body Expr_Parser_Tests is
          R : constant Expr_Parser.Parse_Result := Parse_Source ("2 pi");
       begin
          Require (R.Had_Error, "juxtapose: err");
+      end;
+
+      declare
+         B : constant Expr_Preprocessor.Binding_Array :=
+           [1 =>
+              (Name  => To_Unbounded_String ("$X"),
+               Value => To_Unbounded_String ("1+"))];
+         Prep : constant Expr_Preprocessor.Preprocess_Result :=
+           Expr_Preprocessor.Preprocess ("$X", B);
+         Tok  : constant Expr_Tokenizer.Tokenize_Result :=
+           Expr_Tokenizer.Tokenize
+             (To_String (Prep.Text), Prep.Origins);
+         R    : constant Expr_Parser.Parse_Result :=
+           Expr_Parser.Parse (Tok.Tokens.all);
+      begin
+         Require (not Prep.Had_Error, "var-parse-prep: ok");
+         Require (R.Had_Error, "var-parse: err");
+         Require (R.From_Var, "var-parse: from-var");
+         Require
+           (To_String (R.Var_Name) = "$X",
+            "var-parse: var-name");
       end;
 
       --  Emitters

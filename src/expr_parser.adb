@@ -22,7 +22,7 @@ package body Expr_Parser is
    function Node_Label (N : Node_Access) return String is
    begin
       case N.Kind is
-         when Number_Node | Constant_Node | Variable_Node | Call_Node =>
+         when Number_Node | Constant_Node | Call_Node =>
             return To_String (N.Lexeme);
          when UPlus_Node =>
             return "u+";
@@ -49,14 +49,44 @@ package body Expr_Parser is
       Pos    : Natural := Tokens'First;
       Result : Parse_Result;
 
-      procedure Fail (Line, Col : Positive; Msg : String) is
+      procedure Fail_At (Line, Col : Positive; Msg : String) is
       begin
          Result.Had_Error := True;
          Result.Error_Line := Line;
          Result.Error_Col := Col;
          Result.Message := To_Unbounded_String (Msg);
+         Result.From_Var := False;
+         Result.Var_Name := Null_Unbounded_String;
          Result.Root := null;
-      end Fail;
+      end Fail_At;
+
+      procedure Fail_Tok (T : Expr_Tokenizer.Token; Msg : String) is
+      begin
+         Result.Had_Error := True;
+         Result.Error_Line := T.Line;
+         Result.Error_Col := T.Column;
+         Result.Message := To_Unbounded_String (Msg);
+         Result.From_Var := T.From_Var;
+         Result.Var_Name := T.Var_Name;
+         Result.Root := null;
+      end Fail_Tok;
+
+      function Last_Token return Expr_Tokenizer.Token is
+      begin
+         if Pos > Tokens'First then
+            return Tokens (Pos - 1);
+         elsif Tokens'Length > 0 then
+            return Tokens (Tokens'Last);
+         else
+            return
+              (Kind     => Expr_Tokenizer.Number,
+               Lexeme   => Null_Unbounded_String,
+               Line     => 1,
+               Column   => 1,
+               From_Var => False,
+               Var_Name => Null_Unbounded_String);
+         end if;
+      end Last_Token;
 
       function At_End return Boolean is
         (Pos > Tokens'Last);
@@ -172,7 +202,7 @@ package body Expr_Parser is
       function Parse_Primary return Node_Access is
       begin
          if At_End then
-            Fail (1, 1, "unexpected end of input");
+            Fail_Tok (Last_Token, "unexpected end of input");
             return null;
          end if;
 
@@ -187,10 +217,6 @@ package body Expr_Parser is
                when Expr_Tokenizer.Constant_Name =>
                   Advance;
                   return Make_Leaf (Constant_Node, T);
-
-               when Expr_Tokenizer.Variable =>
-                  Advance;
-                  return Make_Leaf (Variable_Node, T);
 
                when Expr_Tokenizer.Plus =>
                   Advance;
@@ -223,15 +249,11 @@ package body Expr_Parser is
                         return null;
                      end if;
                      if At_End then
-                        Fail
-                          (T.Line, T.Column, "expected ')'");
+                        Fail_Tok (T, "expected ')'");
                         return null;
                      end if;
                      if Peek.Kind /= Expr_Tokenizer.RParen then
-                        Fail
-                          (Peek.Line,
-                           Peek.Column,
-                           "expected ')'");
+                        Fail_Tok (Peek, "expected ')'");
                         return null;
                      end if;
                      Advance;
@@ -241,18 +263,16 @@ package body Expr_Parser is
                when Expr_Tokenizer.Function_Name =>
                   Advance;
                   if At_End then
-                     Fail
-                       (T.Line,
-                        T.Column,
+                     Fail_Tok
+                       (T,
                         "expected '(' after function '"
                         & To_String (T.Lexeme)
                         & "'");
                      return null;
                   end if;
                   if Peek.Kind /= Expr_Tokenizer.LParen then
-                     Fail
-                       (Peek.Line,
-                        Peek.Column,
+                     Fail_Tok
+                       (Peek,
                         "expected '(' after function '"
                         & To_String (T.Lexeme)
                         & "'");
@@ -260,10 +280,7 @@ package body Expr_Parser is
                   end if;
                   Advance;  --  (
                   if not At_End and then Peek.Kind = Expr_Tokenizer.RParen then
-                     Fail
-                       (Peek.Line,
-                        Peek.Column,
-                        "unexpected token ')'");
+                     Fail_Tok (Peek, "unexpected token ')'");
                      return null;
                   end if;
                   declare
@@ -273,15 +290,11 @@ package body Expr_Parser is
                         return null;
                      end if;
                      if At_End then
-                        Fail
-                          (T.Line, T.Column, "expected ')'");
+                        Fail_Tok (T, "expected ')'");
                         return null;
                      end if;
                      if Peek.Kind /= Expr_Tokenizer.RParen then
-                        Fail
-                          (Peek.Line,
-                           Peek.Column,
-                           "expected ')'");
+                        Fail_Tok (Peek, "expected ')'");
                         return null;
                      end if;
                      Advance;
@@ -289,9 +302,8 @@ package body Expr_Parser is
                   end;
 
                when others =>
-                  Fail
-                    (T.Line,
-                     T.Column,
+                  Fail_Tok
+                    (T,
                      "unexpected token '"
                      & To_String (T.Lexeme)
                      & "'");
@@ -340,7 +352,7 @@ package body Expr_Parser is
 
    begin
       if Tokens'Length = 0 then
-         Fail (1, 1, "unexpected end of input");
+         Fail_At (1, 1, "unexpected end of input");
          return Result;
       end if;
 
@@ -350,10 +362,7 @@ package body Expr_Parser is
       end if;
 
       if not At_End then
-         Fail
-           (Peek.Line,
-            Peek.Column,
-            "unexpected token after expression");
+         Fail_Tok (Peek, "unexpected token after expression");
          Result.Root := null;
          return Result;
       end if;
