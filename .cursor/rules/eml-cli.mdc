@@ -40,13 +40,13 @@ eml help parse
 
 ## Startup banner
 
-Unless `--no-logo` is set, `eml` prints a short banner to **stdout** (never stderr, never the `--output` file):
+Unless `--no-logo` is set, `eml` prints a one-line banner to **stdout** (never stderr, never the `--output` file):
 
 ```
-eml  <version>
-Author: Stefano Anelli
-Commit: <short-hash>
+EML compiler and interpreter - v0.1.<short-hash> - by Stefano Anelli
 ```
+
+`<short-hash>` is the embedded git commit; `<major>.<minor>` comes from the crate version (e.g. `0.1.0-dev` → `0.1`).
 
 With `--output`/`-o`, the banner still goes to stdout while command output goes only to the file. Without `-o`, stdout is the banner (unless `--no-logo`) then the dump; use `--no-logo` for a pure dump (pipes, tests).
 
@@ -192,14 +192,42 @@ eml parse --no-logo -i filename.teml -of svg -o other.svg
 
 ## `compile`
 
+Lower a `.teml` syntax tree to stack-machine IR and write textual `.eml` or binary `.beml`.
+
 ```
-eml compile --input filename.teml --output other.eml
-eml compile --input filename.teml --output other.dll --format=cli
-eml compile --input filename.teml --output other.bytecode --format=bytecode
-eml compile --input filename.teml --output other --format=binary
+eml compile --input|-i <file.teml> [--output|-o <file>] [--format|-f eml|beml] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
 ```
 
-`--format` values: `cli` (.NET CLI DLL), `bytecode` (Java), `binary` (LLVM native). EML text is implied by output `*.eml` (no `--format` in the examples). `.teml` and `.eml` inputs are both valid; pick the matching tokenizer/parser.
+- `-i` / `--input` — required; must end in `.teml`
+- `-o` / `--output` — optional; extension must match `--format` (default `beml` → `.beml`); omit → stdout
+- `--format` / `-f` — optional; default `beml`; values `eml` or `beml`. Valid on **`compile` only** (`--format` on preproc/tokenize/parse is invalid CLI). `-of` / `--output-format` stay parse-only and are invalid on `compile`.
+- `--var` / `--warn` / `--no-color` / `--no-logo` — same as parse
+- Flag order free; space-separated only (no `--format=`)
+- Repeated `--format` is invalid CLI
+- `eml help compile` → usage on stdout, exit `0`
+- Unknown `--format` values (including future `cli`, `bytecode`, `binary`) are invalid CLI
+- Exit `0` on success; `1` on invalid CLI, I/O, preprocess, lex, or parse errors
+
+Output extension must match format:
+
+| `-f` | `-o` extension |
+|---|---|
+| `beml` (default) | `.beml` |
+| `eml` | `.eml` |
+
+Pipeline: read file → preprocess → tokenize → parse → lower AST to IR tree → encode as `eml` or `beml`. Stop with no output file on unbound/`--warn error`, lex, or parse errors (same gates as parse).
+
+Examples:
+
+```
+eml compile -i filename.teml
+eml compile -i filename.teml -o other.beml
+eml compile -i filename.teml -o other.eml -f eml
+eml compile --no-logo -i f.teml -f eml
+eml compile -i f.teml -v '$X=1' -w none -o out.beml
+```
+
+Native / .NET / JVM backends (`--format cli`, `bytecode`, `binary`) are not implemented yet.
 
 ## `run`
 

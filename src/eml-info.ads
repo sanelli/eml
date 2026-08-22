@@ -6,4 +6,8 @@ package Eml.Info is
    function Version return String;
    function Git_Commit return String;
 
+   function Banner_Line return String;
+   --  Single-line startup banner:
+   --  EML compiler and interpreter - v<major>.<minor>.<commit> - by <author>
+
 end Eml.Info;

@@ -25,6 +25,34 @@ S → 1 | $VARNAME | eml(S, S)
 
 A `.eml` file is EML text. Without variables it contains only `eml(...)` and `1`.
 
+## Stack-machine IR (`eml compile`)
+
+In-memory IR is a binary tree of `1` and `eml(S, S)` only. The compiler emits a **post-order** instruction stream:
+
+- `ONE` — push constant `1`
+- `EML` — pop `Y`, then `X`; push `eml(X, Y) = exp(X) - ln(Y)`
+
+Well-formed programs satisfy `#ONE = #EML + 1` with no stack underflow.
+
+### Textual `.eml` (`--format eml`)
+
+Header comments (UTC `Date`), then one instruction per line:
+
+```
+-- Source: <path>
+-- Compiler: eml
+-- Version: <version>
+-- Date: YYYY-MM-DD HH:MM:SS UTC
+ONE
+EML  -- <rewrite tag>
+```
+
+`ONE` lines have no trailing comment; only `EML` lines carry an optional `-- <tag>` naming the rewrite.
+
+### Binary `.beml` (`--format beml`, default)
+
+Compact packed-bit encoding of the same stream (no comments, no source path). **Multi-byte integer fields are big-endian** (network byte order): 2-byte UTC year, 4-byte instruction count. Layout: magic `BEML`, version `1`, UTC date/time fields, instruction count, then code bits (`1` = `ONE`, `0` = `EML`, MSB-first per byte; pad low bits of last byte with `0`; count is authoritative).
+
 ## Identities (from the paper; write `eml`, matching the paper)
 
 - `e = eml(1, 1)`

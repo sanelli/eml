@@ -5,10 +5,11 @@ with CLI_Tests;
 with Eml_Parser;
 with Eml_Tokenizer;
 with Expr_Preprocessor_Tests;
+with Expr_Lower_Tests;
 with Expr_Parser_Tests;
 with Expr_Tokenizer_Tests;
 with Interpreter;
-with IR_Eml;
+with IR_Eml_Tests;
 with Regex_Automata_Tests;
 
 procedure Eml_Tests is
@@ -28,12 +29,13 @@ begin
    Expr_Preprocessor_Tests.Run (Failed);
    Expr_Tokenizer_Tests.Run (Failed);
    Expr_Parser_Tests.Run (Failed);
+   IR_Eml_Tests.Run (Failed);
+   Expr_Lower_Tests.Run (Failed);
    CLI_Tests.Run (Failed);
 
    --  Remaining stubs still present
    Require (Eml_Tokenizer.Name = "eml_tokenizer", "Eml_Tokenizer.Name");
    Require (Eml_Parser.Name = "eml_parser", "Eml_Parser.Name");
-   Require (IR_Eml.Name = "ir_eml", "IR_Eml.Name");
    Require (Interpreter.Name = "interpreter", "Interpreter.Name");
 
    if Failed then

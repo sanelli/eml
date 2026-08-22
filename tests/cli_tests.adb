@@ -1,5 +1,7 @@
 with Ada.Command_Line;
 with Ada.Directories;
+with Ada.Streams;
+with Ada.Streams.Stream_IO;
 with Ada.Strings.Fixed;
 with Ada.Strings.Unbounded;
 with Ada.Text_IO;
@@ -9,6 +11,7 @@ with Eml.Info;
 
 package body CLI_Tests is
 
+   use Ada.Streams;
    use Ada.Strings.Unbounded;
    use type Ada.Command_Line.Exit_Status;
 
@@ -51,6 +54,20 @@ package body CLI_Tests is
          Ada.Text_IO.Close (File);
          return To_String (Buffer);
       end Read_All;
+
+      function Read_Bytes
+        (Path : String; Count : Natural) return Stream_Element_Array
+      is
+         File   : Stream_IO.File_Type;
+         Buffer : Stream_Element_Array
+           (1 .. Stream_Element_Offset (Count));
+         Last   : Stream_Element_Offset;
+      begin
+         Stream_IO.Open (File, Stream_IO.In_File, Path);
+         Stream_IO.Read (File, Buffer, Last);
+         Stream_IO.Close (File);
+         return Buffer;
+      end Read_Bytes;
 
       function A (S : String) return Unbounded_String is
         (To_Unbounded_String (S));
@@ -447,6 +464,17 @@ package body CLI_Tests is
       Require (Eml.Info.Author = "Stefano Anelli", "info: author");
       Require (Eml.Info.Version'Length > 0, "info: version");
       Require (Eml.Info.Git_Commit'Length > 0, "info: commit");
+      Require
+        (Ada.Strings.Fixed.Index
+           (Eml.Info.Banner_Line,
+            "EML compiler and interpreter - v0.1.")
+         > 0,
+         "info: banner prefix");
+      Require
+        (Ada.Strings.Fixed.Index
+           (Eml.Info.Banner_Line, " - by Stefano Anelli")
+         > 0,
+         "info: banner suffix");
 
       declare
          Args   : constant Eml.CLI.Arg_Array :=
@@ -483,6 +511,19 @@ package body CLI_Tests is
             A ("--no-color"),
             A ("help"),
             A ("compile")];
+         Status : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Success, "cli-help-compile: exit");
+      end;
+
+      declare
+         Args   : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("help"),
+            A ("emlir")];
          Status : constant Ada.Command_Line.Exit_Status :=
            Eml.CLI.Run (Args);
       begin
@@ -640,6 +681,394 @@ package body CLI_Tests is
       begin
          Require
            (Status = Ada.Command_Line.Success, "cli-help-preproc: exit");
+      end;
+
+      declare
+         In_Path  : constant String := Write_Temp ("cli_compile_e.teml", "e");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_e.beml");
+         Args     : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-o"),
+            A (Out_Path)];
+         Status   : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+         Magic    : constant Stream_Element_Array := Read_Bytes (Out_Path, 4);
+      begin
+         Require (Status = Ada.Command_Line.Success, "cli-compile-beml: exit");
+         Require
+           (Magic (1) = Stream_Element'Val (16#42#)
+            and then Magic (2) = Stream_Element'Val (16#45#)
+            and then Magic (3) = Stream_Element'Val (16#4D#)
+            and then Magic (4) = Stream_Element'Val (16#4C#),
+            "cli-compile-beml: magic");
+      end;
+
+      declare
+         In_Path  : constant String :=
+           Write_Temp ("cli_compile_eml.teml", "e");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_eml.eml");
+         Args     : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-o"),
+            A (Out_Path),
+            A ("-f"),
+            A ("eml")];
+         Status   : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+         Text     : constant String := Read_All (Out_Path);
+      begin
+         Require (Status = Ada.Command_Line.Success, "cli-compile-eml: exit");
+         Require
+           (Ada.Strings.Fixed.Index (Text, "-- Source:") > 0,
+            "cli-compile-eml: header");
+         Require
+           (Ada.Strings.Fixed.Index (Text, "ONE") > 0
+            and then Ada.Strings.Fixed.Index (Text, "EML") > 0,
+            "cli-compile-eml: opcodes");
+         Require
+           (Ada.Strings.Fixed.Index (Text, " UTC") > 0,
+            "cli-compile-eml: utc date");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_compile_fmt.teml", "1");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_fmt.beml");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("--format"),
+            A ("beml"),
+            A ("-o"),
+            A (Out_Path)];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Success, "cli-compile-f-beml: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_compile_alias.teml", "1");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_alias.eml");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-f"),
+            A ("eml"),
+            A ("-o"),
+            A (Out_Path)];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Success, "cli-compile-f-alias: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_compile_order.teml", "1");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_order.beml");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("compile"),
+            A ("-o"),
+            A (Out_Path),
+            A ("-i"),
+            A (In_Path)];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Success, "cli-compile-order: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_compile_var.teml", "1+$X");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_var.beml");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-o"),
+            A (Out_Path),
+            A ("-v"),
+            A ("$X=1"),
+            A ("-w"),
+            A ("none")];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Success, "cli-compile-var: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_compile_stdout.teml", "e");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-f"),
+            A ("eml")];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Success, "cli-compile-stdout: exit");
+      end;
+
+      declare
+         Args   : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"), A ("--no-color"), A ("compile")];
+         Status : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure, "cli-compile-missing-i: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_compile_badin.eml", "eml(1,1)");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path)];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure, "cli-compile-badin: exit");
+      end;
+
+      declare
+         In_Path  : constant String :=
+           Write_Temp ("cli_compile_mismatch.teml", "1");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_mismatch.eml");
+         Args     : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-o"),
+            A (Out_Path)];
+         Status   : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure,
+            "cli-compile-beml-eml-ext: exit");
+      end;
+
+      declare
+         In_Path  : constant String :=
+           Write_Temp ("cli_compile_mismatch2.teml", "1");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_mismatch2.beml");
+         Args     : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-o"),
+            A (Out_Path),
+            A ("-f"),
+            A ("eml")];
+         Status   : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure,
+            "cli-compile-eml-beml-ext: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_compile_of.teml", "1");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("md")];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure, "cli-compile-of: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_parse_format.teml", "1");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("parse"),
+            A ("-i"),
+            A (In_Path),
+            A ("--format"),
+            A ("eml")];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure, "cli-parse-format: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_compile_badfmt.teml", "1");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-f"),
+            A ("cli")];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure, "cli-compile-badfmt: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_compile_dupfmt.teml", "1");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-f"),
+            A ("eml"),
+            A ("-f"),
+            A ("beml")];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure, "cli-compile-dupfmt: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_compile_unbound.teml", "$X");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_unbound.beml");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-o"),
+            A (Out_Path)];
+         Status  : Ada.Command_Line.Exit_Status;
+      begin
+         if Ada.Directories.Exists (Out_Path) then
+            Ada.Directories.Delete_File (Out_Path);
+         end if;
+         Status := Eml.CLI.Run (Args);
+         Require
+           (Status = Ada.Command_Line.Failure, "cli-compile-unbound: exit");
+         Require
+           (not Ada.Directories.Exists (Out_Path),
+            "cli-compile-unbound: no file");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_compile_lex.teml", "1+@2");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_lex.beml");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-o"),
+            A (Out_Path)];
+         Status  : Ada.Command_Line.Exit_Status;
+      begin
+         if Ada.Directories.Exists (Out_Path) then
+            Ada.Directories.Delete_File (Out_Path);
+         end if;
+         Status := Eml.CLI.Run (Args);
+         Require
+           (Status = Ada.Command_Line.Failure, "cli-compile-lex: exit");
+         Require
+           (not Ada.Directories.Exists (Out_Path),
+            "cli-compile-lex: no file");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_compile_parse.teml", "1+");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_parse.beml");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-o"),
+            A (Out_Path)];
+         Status  : Ada.Command_Line.Exit_Status;
+      begin
+         if Ada.Directories.Exists (Out_Path) then
+            Ada.Directories.Delete_File (Out_Path);
+         end if;
+         Status := Eml.CLI.Run (Args);
+         Require
+           (Status = Ada.Command_Line.Failure, "cli-compile-parse: exit");
+         Require
+           (not Ada.Directories.Exists (Out_Path),
+            "cli-compile-parse: no file");
+      end;
+
+      declare
+         Args   : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"), A ("--no-color"), A ("emlir")];
+         Status : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure, "cli-unknown-cmd: exit");
       end;
    end Run;
 

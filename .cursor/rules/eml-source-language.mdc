@@ -38,11 +38,11 @@ Examples: `1+2*3` is add(1, mul(2, 3)); `2^3^2` is pow(2, pow(3, 2)); `-2^2` is 
 - `e`
 - `phi` (golden ratio)
 
-## Variables (preprocessor)
+When lowering to IR (`eml compile`), `log` is **natural log** (`ln`), matching the EML paper. Constant `phi` lowers as `(1 + sqrt(5)) / 2`.
 
 `$VARNAME` is **preprocessor syntax**, not a tokenizer or parser token. Bindings
 are supplied on the CLI as `--var $NAME=EXPRESSION` (or `-v`) on `preproc`,
-`tokenize`, and `parse`. EXPRESSION is pasted textually into the source before
+`tokenize`, `parse`, and `compile`. EXPRESSION is pasted textually into the source before
 tokenization. Unbound `$VARNAME` in the file is an error (every occurrence
 reported). Unused `--var` bindings emit warnings unless `--warn none`.
 

@@ -1,16 +1,20 @@
+with Ada.Calendar;
 with Ada.Exceptions;
 with Ada.Text_IO;
 
 with Eml.Info;
+with Expr_Lower;
 with Expr_Preprocessor;
 with Expr_Parser;
 with Expr_Tokenizer;
+with IR_Eml;
 
 package body Eml.CLI is
 
    use Ada.Strings.Unbounded;
    use type Expr_Tokenizer.Diagnostic_Array_Access;
    use type Expr_Parser.Output_Format;
+   use type IR_Eml.Output_Format;
    use Expr_Preprocessor;
    use type Ada.Command_Line.Exit_Status;
 
@@ -20,7 +24,7 @@ package body Eml.CLI is
    Yellow_Off : constant String := ASCII.ESC & "[0m";
 
    Expected_Cmds : constant String :=
-     "help, preproc, tokenize, or parse";
+     "help, preproc, tokenize, parse, or compile";
 
    type Warn_Mode is (Default_Warn, No_Warn, Error_Warn);
 
@@ -52,14 +56,7 @@ package body Eml.CLI is
    procedure Put_Banner is
    begin
       Ada.Text_IO.Put_Line
-        (Ada.Text_IO.Standard_Output,
-         Eml.Info.Program_Name & "  " & Eml.Info.Version);
-      Ada.Text_IO.Put_Line
-        (Ada.Text_IO.Standard_Output,
-         "Author: " & Eml.Info.Author);
-      Ada.Text_IO.Put_Line
-        (Ada.Text_IO.Standard_Output,
-         "Commit: " & Eml.Info.Git_Commit);
+        (Ada.Text_IO.Standard_Output, Eml.Info.Banner_Line);
    end Put_Banner;
 
    procedure Put_Stdout (Text : String) is
@@ -124,6 +121,14 @@ package body Eml.CLI is
          & "[--warn|-w default|none|error] "
          & "[--no-color] [--no-logo]",
          Use_Color);
+      Put_Stderr
+        ("  eml compile --input|-i <file.teml> "
+         & "[--output|-o <file>] "
+         & "[--format|-f eml|beml] "
+         & "[--var|-v $NAME=EXPR]... "
+         & "[--warn|-w default|none|error] "
+         & "[--no-color] [--no-logo]",
+         Use_Color);
    end Put_Usage_Lines;
 
    procedure Put_General_Help is
@@ -144,7 +149,9 @@ package body Eml.CLI is
       Put_Stdout
         ("  parse      Dump the syntax tree of a .teml source file");
       Put_Stdout
-        ("             (compile and run are not implemented yet)");
+        ("  compile    Lower a .teml file to EML IR (.beml or .eml)");
+      Put_Stdout
+        ("             (run is not implemented yet)");
       Put_Stdout ("");
       Put_Stdout ("Common options:");
       Put_Stdout
@@ -163,11 +170,58 @@ package body Eml.CLI is
       Put_Stdout ("  eml preproc -i f.teml -v '$X=1+2'");
       Put_Stdout ("  eml tokenize -i filename.teml");
       Put_Stdout ("  eml parse -i filename.teml");
+      Put_Stdout ("  eml compile -i filename.teml -o out.beml");
       Put_Stdout ("");
       Put_Stdout
         ("Exit status: 0 on success, 1 on CLI, I/O, preprocess, lex, "
          & "or parse errors.");
    end Put_General_Help;
+
+   procedure Put_Compile_Help is
+   begin
+      Put_Stdout ("eml compile - lower a .teml file to EML IR");
+      Put_Stdout ("");
+      Put_Stdout ("Usage:");
+      Put_Stdout
+        ("  eml compile --input|-i <file.teml> "
+         & "[--output|-o <file>] "
+         & "[--format|-f eml|beml] "
+         & "[--var|-v $NAME=EXPR]... "
+         & "[--warn|-w default|none|error] "
+         & "[--no-color] [--no-logo]");
+      Put_Stdout ("");
+      Put_Stdout ("Options:");
+      Put_Stdout
+        ("  --input, -i <file.teml>     Required input (.teml only)");
+      Put_Stdout
+        ("  --output, -o <file>         Optional output; stdout if omitted");
+      Put_Stdout
+        ("  --format, -f FMT            beml (default) or eml");
+      Put_Stdout
+        ("  --var, -v $NAME=EXPR        Preprocessor binding (repeatable)");
+      Put_Stdout
+        ("  --warn, -w MODE             default, none, or error");
+      Put_Stdout
+        ("  --no-color                  Plain stderr diagnostics");
+      Put_Stdout
+        ("  --no-logo                   Suppress the startup banner");
+      Put_Stdout ("");
+      Put_Stdout ("Output extensions must match --format:");
+      Put_Stdout ("  beml -> .beml");
+      Put_Stdout ("  eml  -> .eml");
+      Put_Stdout ("");
+      Put_Stdout ("Examples:");
+      Put_Stdout ("  eml compile -i filename.teml -o other.beml");
+      Put_Stdout ("  eml compile -i filename.teml -o other.eml -f eml");
+      Put_Stdout ("  eml --no-logo compile -i f.teml -f eml");
+      Put_Stdout ("");
+      Put_Stdout
+        ("Preprocessor runs first, then tokenize, parse, and IR lowering.");
+      Put_Stdout
+        ("Use --no-logo when piping binary .beml to stdout.");
+      Put_Stdout
+        ("Exit status: 0 on success, otherwise 1.");
+   end Put_Compile_Help;
 
    procedure Put_Preproc_Help is
    begin
@@ -517,6 +571,31 @@ package body Eml.CLI is
       end case;
    end Format_Extension;
 
+   function Parse_Compile_Format
+     (S : String; Ok : out Boolean) return IR_Eml.Output_Format
+   is
+   begin
+      Ok := True;
+      if S = "eml" then
+         return IR_Eml.Eml_Text;
+      elsif S = "beml" then
+         return IR_Eml.Beml_Binary;
+      else
+         Ok := False;
+         return IR_Eml.Beml_Binary;
+      end if;
+   end Parse_Compile_Format;
+
+   function Compile_Extension (Fmt : IR_Eml.Output_Format) return String is
+   begin
+      case Fmt is
+         when IR_Eml.Eml_Text =>
+            return ".eml";
+         when IR_Eml.Beml_Binary =>
+            return ".beml";
+      end case;
+   end Compile_Extension;
+
    function Run_Preproc
      (Input_Path  : String;
       Output_Path : String;
@@ -660,6 +739,88 @@ package body Eml.CLI is
       end;
    end Run_Parse;
 
+   function Run_Emlir
+     (Input_Path  : String;
+      Output_Path : String;
+      Has_Output  : Boolean;
+      Fmt         : IR_Eml.Output_Format;
+      Bindings    : Binding_Array;
+      Warn        : Warn_Mode;
+      Use_Color   : Boolean) return Ada.Command_Line.Exit_Status
+   is
+      Source : constant String := Read_File (Input_Path);
+      Prep   : Expr_Preprocessor.Preprocess_Result;
+      Status : Ada.Command_Line.Exit_Status;
+      Tok    : Expr_Tokenizer.Tokenize_Result;
+      Meta   : IR_Eml.Dump_Meta;
+      IR     : IR_Eml.Node_Access;
+   begin
+      Status := Preprocess_And_Check (Source, Bindings, Warn, Use_Color, Prep);
+      if Status /= Ada.Command_Line.Success then
+         return Status;
+      end if;
+
+      Tok :=
+        Expr_Tokenizer.Tokenize
+          (To_String (Prep.Text), Prep.Origins);
+
+      if Tok.Had_Errors then
+         if Tok.Diagnostics /= null then
+            for D of Tok.Diagnostics.all loop
+               Put_Stderr
+                 ("error: invalid token at line "
+                  & Trim_Positive (D.Line)
+                  & ", column "
+                  & Trim_Positive (D.Column)
+                  & ": "
+                  & Format_Lex_Message (D),
+                  Use_Color);
+            end loop;
+         end if;
+         return Ada.Command_Line.Failure;
+      end if;
+
+      declare
+         Parsed : constant Expr_Parser.Parse_Result :=
+           Expr_Parser.Parse (Tok.Tokens.all);
+      begin
+         if Parsed.Had_Error then
+            Put_Stderr
+              ("error: parse error at line "
+               & Trim_Positive (Parsed.Error_Line)
+               & ", column "
+               & Trim_Positive (Parsed.Error_Col)
+               & ": "
+               & Format_Parse_Message (Parsed),
+               Use_Color);
+            return Ada.Command_Line.Failure;
+         end if;
+
+         Meta :=
+           (Source_Path => To_Unbounded_String (Input_Path),
+            Version     => To_Unbounded_String (Eml.Info.Version),
+            Compiled_At => Ada.Calendar.Clock);
+
+         IR := Expr_Lower.Lower (Parsed.Root);
+
+         case Fmt is
+            when IR_Eml.Eml_Text =>
+               if Has_Output then
+                  IR_Eml.Write_Eml_To_File (IR, Meta, Output_Path);
+               else
+                  IR_Eml.Write_Eml_To_Stdout (IR, Meta);
+               end if;
+            when IR_Eml.Beml_Binary =>
+               if Has_Output then
+                  IR_Eml.Write_Beml_To_File (IR, Meta, Output_Path);
+               else
+                  IR_Eml.Write_Beml_To_Stdout (IR, Meta);
+               end if;
+         end case;
+         return Ada.Command_Line.Success;
+      end;
+   end Run_Emlir;
+
    function Run (Args : Arg_Array) return Ada.Command_Line.Exit_Status is
       No_Color      : Boolean := False;
       No_Logo       : Boolean := False;
@@ -668,12 +829,14 @@ package body Eml.CLI is
       Input_Path    : Unbounded_String;
       Output_Path   : Unbounded_String;
       Format_Text   : Unbounded_String;
+      Compile_Text  : Unbounded_String;
       Warn_Text     : Unbounded_String := To_Unbounded_String ("default");
       Bindings      : Binding_List (1 .. 64);
       Binding_Count : Natural := 0;
       Have_Input    : Boolean := False;
       Have_Output   : Boolean := False;
       Have_Format   : Boolean := False;
+      Have_Compile_Format : Boolean := False;
       Have_Warn     : Boolean := False;
       Have_Sub      : Boolean := False;
       Have_Topic    : Boolean := False;
@@ -681,7 +844,9 @@ package body Eml.CLI is
       Use_Color     : Boolean;
       Cmd           : Unbounded_String;
       Fmt           : Expr_Parser.Output_Format := Expr_Parser.Mermaid;
+      Compile_Fmt   : IR_Eml.Output_Format := IR_Eml.Beml_Binary;
       Format_Ok     : Boolean;
+      Compile_Ok    : Boolean;
       Warn_Ok       : Boolean;
       Warn          : Warn_Mode := Default_Warn;
       Var_Ok        : Boolean;
@@ -796,6 +961,26 @@ package body Eml.CLI is
                Format_Text := Args (I + 1);
                Have_Format := True;
                I := I + 2;
+            elsif A = "--format" or else A = "-f" then
+               if Have_Compile_Format then
+                  if not No_Logo then
+                     Put_Banner;
+                  end if;
+                  Fail_CLI
+                    ("error: repeated --format/-f", not No_Color);
+                  return Ada.Command_Line.Failure;
+               end if;
+               if I = Args'Last then
+                  if not No_Logo then
+                     Put_Banner;
+                  end if;
+                  Fail_CLI
+                    ("error: missing value for " & A, not No_Color);
+                  return Ada.Command_Line.Failure;
+               end if;
+               Compile_Text := Args (I + 1);
+               Have_Compile_Format := True;
+               I := I + 2;
             elsif A = "--var" or else A = "-v" then
                if I = Args'Last then
                   if not No_Logo then
@@ -909,6 +1094,9 @@ package body Eml.CLI is
          elsif To_String (Topic) = "parse" then
             Put_Parse_Help;
             return Ada.Command_Line.Success;
+         elsif To_String (Topic) = "compile" then
+            Put_Compile_Help;
+            return Ada.Command_Line.Success;
          else
             Fail_CLI
               ("error: unknown help topic '"
@@ -922,6 +1110,7 @@ package body Eml.CLI is
       if To_String (Cmd) /= "preproc"
         and then To_String (Cmd) /= "tokenize"
         and then To_String (Cmd) /= "parse"
+        and then To_String (Cmd) /= "compile"
       then
          Fail_CLI
            ("error: unknown command '"
@@ -936,6 +1125,20 @@ package body Eml.CLI is
       if Have_Format and then To_String (Cmd) /= "parse" then
          Fail_CLI
            ("error: --output-format/-of is only valid for parse",
+            Use_Color);
+         return Ada.Command_Line.Failure;
+      end if;
+
+      if Have_Compile_Format and then To_String (Cmd) /= "compile" then
+         Fail_CLI
+           ("error: --format/-f is only valid for compile",
+            Use_Color);
+         return Ada.Command_Line.Failure;
+      end if;
+
+      if To_String (Cmd) = "compile" and then Have_Format then
+         Fail_CLI
+           ("error: --output-format/-of is not valid for compile",
             Use_Color);
          return Ada.Command_Line.Failure;
       end if;
@@ -994,6 +1197,52 @@ package body Eml.CLI is
                  (To_String (Input_Path),
                   To_String (Output_Path),
                   Have_Output,
+                  Binds,
+                  Warn,
+                  Use_Color);
+            exception
+               when E : others =>
+                  Put_Stderr
+                    ("error: " & Ada.Exceptions.Exception_Message (E),
+                     Use_Color);
+                  return Ada.Command_Line.Failure;
+            end;
+         end if;
+
+         if To_String (Cmd) = "compile" then
+            if Have_Compile_Format then
+               Compile_Fmt :=
+                 Parse_Compile_Format (To_String (Compile_Text), Compile_Ok);
+               if not Compile_Ok then
+                  Fail_CLI
+                    ("error: unknown compile format '"
+                     & To_String (Compile_Text)
+                     & "' (expected eml or beml)",
+                     Use_Color);
+                  return Ada.Command_Line.Failure;
+               end if;
+            end if;
+
+            if Have_Output
+              and then not Ends_With
+                (To_String (Output_Path), Compile_Extension (Compile_Fmt))
+            then
+               Fail_CLI
+                 ("error: output must end with "
+                  & Compile_Extension (Compile_Fmt)
+                  & " for format "
+                  & (if Have_Compile_Format then To_String (Compile_Text)
+                     else "beml"),
+                  Use_Color);
+               return Ada.Command_Line.Failure;
+            end if;
+
+            begin
+               return Run_Emlir
+                 (To_String (Input_Path),
+                  To_String (Output_Path),
+                  Have_Output,
+                  Compile_Fmt,
                   Binds,
                   Warn,
                   Use_Color);

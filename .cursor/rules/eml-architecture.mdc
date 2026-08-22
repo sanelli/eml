@@ -23,11 +23,12 @@ Tokenizers emit tokens. Parsers emit trees / IR. Do not skip the parse step.
 ## Pipelines
 
 ```
-.teml → preprocessor → expr tokenizer → expr parser → IR EML → .eml | native | .NET | JVM | interpret
+.teml → preprocessor → expr tokenizer → expr parser → IR EML → .eml | .beml | native | .NET | JVM | interpret
 .eml  → eml tokenizer  → eml parser  → IR EML → native | .NET | JVM | interpret
 .teml | .eml → preproc (`.teml` only) → expanded `.teml`
 .teml | .eml → tokenize → .tokens
 .teml | .eml → parse     → .syntaxtree
+.teml       → compile    → .eml | .beml   (stack IR via `eml compile`)
 ```
 
 Input extension selects the tokenizer/parser. `tokenize` stops at tokens; `parse` stops at the syntax tree. Neither requires lowering to backends.

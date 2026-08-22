@@ -6,14 +6,13 @@
 #   pwsh -File scripts/run_samples.ps1 -Operations tokenize,parse,preproc
 #   pwsh -File scripts/run_samples.ps1 --operations tokenize parse
 #
-# -Operations / --operations: one or more of preproc, tokenize, parse.
+# -Operations / --operations: one or more of preproc, tokenize, parse, compile.
 # If omitted (or empty), all operations are run.
 #
 # Results are written under .results/<operation>/. Exit 0 if every sample
 # succeeds for every requested operation, otherwise 1.
 #
-# For parse, each sample is written in all four formats:
-#   .syntaxtree (mermaid), .md, .dot, .svg
+# For compile, each sample writes default .beml and -f eml .eml under .results/compile/
 
 [CmdletBinding()]
 param(
@@ -29,7 +28,7 @@ $ErrorActionPreference = "Continue"
 $Root = Split-Path -Parent $PSScriptRoot
 $SamplesDir = Join-Path $Root "samples"
 $Eml = Join-Path $Root "bin" "eml"
-$AllOperations = @("preproc", "tokenize", "parse")
+$AllOperations = @("preproc", "tokenize", "parse", "compile")
 
 # Dummy bindings for parameterized samples; --warn none suppresses unused warnings.
 $SampleVarArgs = @(
@@ -170,6 +169,43 @@ function Invoke-TokenizeSamples {
     return $LocalFailed
 }
 
+function Invoke-CompileSamples {
+    param(
+        [System.IO.FileInfo[]] $SampleList,
+        [string] $ResultsDir
+    )
+
+    $LocalFailed = 0
+    New-Item -ItemType Directory -Force -Path $ResultsDir | Out-Null
+
+    foreach ($Sample in $SampleList) {
+        $Base = [System.IO.Path]::GetFileNameWithoutExtension($Sample.Name)
+        $BemlName = $Base + ".beml"
+        $EmlName = $Base + ".eml"
+        $BemlPath = Join-Path $ResultsDir $BemlName
+        $EmlPath = Join-Path $ResultsDir $EmlName
+        Write-Host "compile $($Sample.Name) -> .results/compile/$BemlName (default beml)"
+
+        & $script:Eml --no-logo --no-color compile -i $Sample.FullName @SampleVarArgs -o $BemlPath
+        $Code = $LASTEXITCODE
+        if ($Code -ne 0) {
+            Write-Host "FAIL: $($Sample.Name) beml (exit $Code)"
+            $LocalFailed = 1
+            continue
+        }
+
+        Write-Host "compile $($Sample.Name) -f eml -> .results/compile/$EmlName"
+
+        & $script:Eml --no-logo --no-color compile -i $Sample.FullName @SampleVarArgs -f eml -o $EmlPath
+        $Code = $LASTEXITCODE
+        if ($Code -ne 0) {
+            Write-Host "FAIL: $($Sample.Name) eml (exit $Code)"
+            $LocalFailed = 1
+        }
+    }
+    return $LocalFailed
+}
+
 function Invoke-ParseAllFormats {
     param(
         [System.IO.FileInfo] $Sample,
@@ -229,6 +265,9 @@ foreach ($Op in $Operations) {
     }
     elseif ($Op -eq "parse") {
         $Code = Invoke-ParseSamples -SampleList $Samples -ResultsDir $ResultsDir
+    }
+    elseif ($Op -eq "compile") {
+        $Code = Invoke-CompileSamples -SampleList $Samples -ResultsDir $ResultsDir
     }
     else {
         Write-Error "unknown operation '$Op'."
