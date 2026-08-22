@@ -1,0 +1,24 @@
+---
+description: Compilation targets from IR EML (EML text, LLVM, .NET, Java bytecode)
+alwaysApply: true
+---
+
+# Compilation targets
+
+All backends consume **IR EML** (never the source AST directly).
+
+| Target | Role |
+|---|---|
+| **EML text** | Pretty-print IR as `eml(...)` and `1` only |
+| **Native binary** | Lower IR EML through **LLVM** to a machine-code executable |
+| **.NET CLI** | Emit a **.NET CLI DLL/executable**; **may use** .NET math |
+| **Java bytecode** | Emit a **Java class**; **may use** Java math |
+| **Interpreter** | Evaluate IR EML in-process (same executable) |
+
+Native LLVM lowering should realize `eml(x, y) = exp(x) - ln(y)` (complex). .NET and Java backends may call the host language’s `exp` / `log` (and other math) instead of expanding everything to a single opcode.
+
+`eml compile --format` maps: `cli` → .NET DLL, `bytecode` → Java, `binary` → LLVM native. Output `*.eml` is EML text. See `eml-cli`.
+
+## Not yet specified
+
+- Runtime ABI for `$VARNAME` inside generated binaries (how compiled `cli` / `bytecode` / `binary` artifacts receive bindings).

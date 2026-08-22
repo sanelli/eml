@@ -1,4 +1,4 @@
---  Tokenize .telm source expressions using Regex_Automata.
+--  Tokenize .teml source expressions using Regex_Automata.
 with Ada.Strings.Unbounded;
 with Ada.Text_IO;
 

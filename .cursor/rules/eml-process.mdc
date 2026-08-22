@@ -7,12 +7,12 @@ alwaysApply: true
 
 The user will request **code in small chunks**. For each **new feature**:
 
-- First produce a **plan** (`elm-planning`): numbered steps, matching numbered TODOs, and tests. Do not implement until the user starts a chunk.
+- First produce a **plan** (`eml-planning`): numbered steps, matching numbered TODOs, and tests. Do not implement until the user starts a chunk.
 - Check the git branch name matches the plan. If not, **ask** to create one from `main`. After permission, **create** that feature branch before coding. Do not implement on `main` unless told to.
 - Implement **only** that chunk. Do not write ahead (other packages, unused backends, the VS Code extension, CI YAML, extras).
 - Match existing Ada/Alire layout once it exists.
 - After a chunk, stop. Summarize what was added and what is still missing for that chunk.
-- Do not commit or push unless asked. When committing feature work, **always include the plan** under `.cursor/plans/` (see `elm-planning`). Never delete plan files. Network commands: `elm-shell` (grant network, clear proxy env vars).
+- Do not commit or push unless asked. When committing feature work, **always include the plan** under `.cursor/plans/` (see `eml-planning`). Never delete plan files. Network commands: `eml-shell` (grant network, clear proxy env vars).
 
 ## Tests
 
@@ -22,9 +22,9 @@ When possible, **report code coverage** for the change (tooling TBD; do not skip
 
 ## Out of scope until explicitly requested
 
-- LaTeX (or other) input besides `.telm` / `.elm`
-- Extra debug (traces, stepwise evaluation UI). `elm tokenize` and `elm parse` dumps are in scope.
-- Optimizations (algebraic simplification, ELM-tree depth reduction, backend opts)
+- LaTeX (or other) input besides `.teml` / `.eml`
+- Extra debug (traces, stepwise evaluation UI). `eml tokenize` and `eml parse` dumps are in scope.
+- Optimizations (algebraic simplification, EML-tree depth reduction, backend opts)
 - Programmatic VS Code features (language server, completions, diagnostics) beyond declarative editing
 
 Do not design APIs around these until they are in scope.

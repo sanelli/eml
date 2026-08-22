@@ -1,11 +1,11 @@
 with Ada.Exceptions;
 with Ada.Text_IO;
 
-with Elm.Info;
+with Eml.Info;
 with Expr_Parser;
 with Expr_Tokenizer;
 
-package body Elm.CLI is
+package body Eml.CLI is
 
    use Ada.Strings.Unbounded;
    use type Expr_Tokenizer.Diagnostic_Array_Access;
@@ -19,7 +19,7 @@ package body Elm.CLI is
 
    function Identity return String is
    begin
-      return "elm";
+      return "eml";
    end Identity;
 
    function Trim_Positive (N : Positive) return String is
@@ -44,13 +44,13 @@ package body Elm.CLI is
    begin
       Ada.Text_IO.Put_Line
         (Ada.Text_IO.Standard_Output,
-         Elm.Info.Program_Name & "  " & Elm.Info.Version);
+         Eml.Info.Program_Name & "  " & Eml.Info.Version);
       Ada.Text_IO.Put_Line
         (Ada.Text_IO.Standard_Output,
-         "Author: " & Elm.Info.Author);
+         "Author: " & Eml.Info.Author);
       Ada.Text_IO.Put_Line
         (Ada.Text_IO.Standard_Output,
-         "Commit: " & Elm.Info.Git_Commit);
+         "Commit: " & Eml.Info.Git_Commit);
    end Put_Banner;
 
    procedure Put_Stdout (Text : String) is
@@ -71,14 +71,14 @@ package body Elm.CLI is
    procedure Put_Usage_Lines (Use_Color : Boolean) is
    begin
       Put_Stderr ("Usage:", Use_Color);
-      Put_Stderr ("  elm <command> [options]", Use_Color);
-      Put_Stderr ("  elm help [command]", Use_Color);
+      Put_Stderr ("  eml <command> [options]", Use_Color);
+      Put_Stderr ("  eml help [command]", Use_Color);
       Put_Stderr
-        ("  elm tokenize --input|-i <file.telm> "
+        ("  eml tokenize --input|-i <file.teml> "
          & "[--output|-o <file.tokens>] [--no-color] [--no-logo]",
          Use_Color);
       Put_Stderr
-        ("  elm parse --input|-i <file.telm> "
+        ("  eml parse --input|-i <file.teml> "
          & "[--output|-o <file>] "
          & "[--output-format|-of mermaid|md|dot|svg] "
          & "[--no-color] [--no-logo]",
@@ -87,19 +87,19 @@ package body Elm.CLI is
 
    procedure Put_General_Help is
    begin
-      Put_Stdout ("elm - ELM compiler and interpreter");
+      Put_Stdout ("eml - EML compiler and interpreter");
       Put_Stdout ("");
       Put_Stdout ("Usage:");
-      Put_Stdout ("  elm <command> [options]");
-      Put_Stdout ("  elm help [command]");
+      Put_Stdout ("  eml <command> [options]");
+      Put_Stdout ("  eml help [command]");
       Put_Stdout ("");
       Put_Stdout ("Commands:");
       Put_Stdout
         ("  help       Show this help, or help for a specific command");
       Put_Stdout
-        ("  tokenize   Dump the token stream of a .telm source file");
+        ("  tokenize   Dump the token stream of a .teml source file");
       Put_Stdout
-        ("  parse      Dump the syntax tree of a .telm source file");
+        ("  parse      Dump the syntax tree of a .teml source file");
       Put_Stdout
         ("             (compile and run are not implemented yet)");
       Put_Stdout ("");
@@ -110,11 +110,11 @@ package body Elm.CLI is
         ("  --no-logo    Suppress the startup banner on stdout");
       Put_Stdout ("");
       Put_Stdout ("Examples:");
-      Put_Stdout ("  elm help");
-      Put_Stdout ("  elm help tokenize");
-      Put_Stdout ("  elm help parse");
-      Put_Stdout ("  elm tokenize -i filename.telm");
-      Put_Stdout ("  elm parse -i filename.telm");
+      Put_Stdout ("  eml help");
+      Put_Stdout ("  eml help tokenize");
+      Put_Stdout ("  eml help parse");
+      Put_Stdout ("  eml tokenize -i filename.teml");
+      Put_Stdout ("  eml parse -i filename.teml");
       Put_Stdout ("");
       Put_Stdout
         ("Exit status: 0 on success, 1 on CLI, I/O, lex, or parse "
@@ -123,16 +123,16 @@ package body Elm.CLI is
 
    procedure Put_Tokenize_Help is
    begin
-      Put_Stdout ("elm tokenize - dump tokens from a .telm file");
+      Put_Stdout ("eml tokenize - dump tokens from a .teml file");
       Put_Stdout ("");
       Put_Stdout ("Usage:");
       Put_Stdout
-        ("  elm tokenize --input|-i <file.telm> "
+        ("  eml tokenize --input|-i <file.teml> "
          & "[--output|-o <file.tokens>] [--no-color] [--no-logo]");
       Put_Stdout ("");
       Put_Stdout ("Options:");
       Put_Stdout
-        ("  --input, -i <file.telm>     Required input file (.telm only)");
+        ("  --input, -i <file.teml>     Required input file (.teml only)");
       Put_Stdout
         ("  --output, -o <file.tokens>  Optional token dump file;");
       Put_Stdout
@@ -143,11 +143,11 @@ package body Elm.CLI is
         ("  --no-logo                   Suppress the startup banner");
       Put_Stdout ("");
       Put_Stdout ("Examples:");
-      Put_Stdout ("  elm tokenize -i filename.telm");
+      Put_Stdout ("  eml tokenize -i filename.teml");
       Put_Stdout
-        ("  elm tokenize -i filename.telm -o other.tokens");
+        ("  eml tokenize -i filename.teml -o other.tokens");
       Put_Stdout
-        ("  elm --no-logo tokenize -i filename.telm");
+        ("  eml --no-logo tokenize -i filename.teml");
       Put_Stdout ("");
       Put_Stdout
         ("Invalid tokens are reported on stderr; scanning continues.");
@@ -157,18 +157,18 @@ package body Elm.CLI is
 
    procedure Put_Parse_Help is
    begin
-      Put_Stdout ("elm parse - dump the syntax tree from a .telm file");
+      Put_Stdout ("eml parse - dump the syntax tree from a .teml file");
       Put_Stdout ("");
       Put_Stdout ("Usage:");
       Put_Stdout
-        ("  elm parse --input|-i <file.telm> "
+        ("  eml parse --input|-i <file.teml> "
          & "[--output|-o <file>] "
          & "[--output-format|-of mermaid|md|dot|svg] "
          & "[--no-color] [--no-logo]");
       Put_Stdout ("");
       Put_Stdout ("Options:");
       Put_Stdout
-        ("  --input, -i <file.telm>       Required input (.telm only)");
+        ("  --input, -i <file.teml>       Required input (.teml only)");
       Put_Stdout
         ("  --output, -o <file>          Optional dump file; if omitted,");
       Put_Stdout
@@ -187,13 +187,13 @@ package body Elm.CLI is
       Put_Stdout ("  svg     -> .svg");
       Put_Stdout ("");
       Put_Stdout ("Examples:");
-      Put_Stdout ("  elm parse -i filename.telm");
+      Put_Stdout ("  eml parse -i filename.teml");
       Put_Stdout
-        ("  elm parse -i filename.telm -o other.syntaxtree");
+        ("  eml parse -i filename.teml -o other.syntaxtree");
       Put_Stdout
-        ("  elm parse -i filename.telm -of md -o other.md");
+        ("  eml parse -i filename.teml -of md -o other.md");
       Put_Stdout
-        ("  elm --no-logo parse -i filename.telm -of svg -o t.svg");
+        ("  eml --no-logo parse -i filename.teml -of svg -o t.svg");
       Put_Stdout ("");
       Put_Stdout
         ("Lex and parse errors are reported on stderr; no tree is "
@@ -206,7 +206,7 @@ package body Elm.CLI is
    begin
       Put_Stderr (Message, Use_Color);
       Put_Usage_Lines (Use_Color);
-      Put_Stderr ("Try 'elm help' for more information.", Use_Color);
+      Put_Stderr ("Try 'eml help' for more information.", Use_Color);
    end Fail_CLI;
 
    function Read_File (Path : String) return String is
@@ -525,7 +525,7 @@ package body Elm.CLI is
             Fail_CLI
               ("error: unknown help topic '"
                & To_String (Topic)
-               & "' (try: elm help tokenize)",
+               & "' (try: eml help tokenize)",
                Use_Color);
             return Ada.Command_Line.Failure;
          end if;
@@ -556,8 +556,8 @@ package body Elm.CLI is
          return Ada.Command_Line.Failure;
       end if;
 
-      if not Ends_With (To_String (Input_Path), ".telm") then
-         Fail_CLI ("error: input must be a .telm file", Use_Color);
+      if not Ends_With (To_String (Input_Path), ".teml") then
+         Fail_CLI ("error: input must be a .teml file", Use_Color);
          return Ada.Command_Line.Failure;
       end if;
 
@@ -640,4 +640,4 @@ package body Elm.CLI is
       Ada.Command_Line.Set_Exit_Status (Status);
    end Run;
 
-end Elm.CLI;
+end Eml.CLI;

@@ -2,15 +2,15 @@ with Ada.Command_Line;
 with Ada.Text_IO;
 
 with CLI_Tests;
-with Elm_Parser;
-with Elm_Tokenizer;
+with Eml_Parser;
+with Eml_Tokenizer;
 with Expr_Parser_Tests;
 with Expr_Tokenizer_Tests;
 with Interpreter;
-with IR_Elm;
+with IR_Eml;
 with Regex_Automata_Tests;
 
-procedure Elm_Tests is
+procedure Eml_Tests is
 
    Failed : Boolean := False;
 
@@ -29,16 +29,16 @@ begin
    CLI_Tests.Run (Failed);
 
    --  Remaining stubs still present
-   Require (Elm_Tokenizer.Name = "elm_tokenizer", "Elm_Tokenizer.Name");
-   Require (Elm_Parser.Name = "elm_parser", "Elm_Parser.Name");
-   Require (IR_Elm.Name = "ir_elm", "IR_Elm.Name");
+   Require (Eml_Tokenizer.Name = "eml_tokenizer", "Eml_Tokenizer.Name");
+   Require (Eml_Parser.Name = "eml_parser", "Eml_Parser.Name");
+   Require (IR_Eml.Name = "ir_eml", "IR_Eml.Name");
    Require (Interpreter.Name = "interpreter", "Interpreter.Name");
 
    if Failed then
-      Ada.Text_IO.Put_Line ("elm_tests: FAILED");
+      Ada.Text_IO.Put_Line ("eml_tests: FAILED");
       Ada.Command_Line.Set_Exit_Status (Ada.Command_Line.Failure);
    else
-      Ada.Text_IO.Put_Line ("elm_tests: OK");
+      Ada.Text_IO.Put_Line ("eml_tests: OK");
       Ada.Command_Line.Set_Exit_Status (Ada.Command_Line.Success);
    end if;
-end Elm_Tests;
+end Eml_Tests;

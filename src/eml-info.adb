@@ -1,11 +1,11 @@
-with Elm_Config;
-with Elm_Git_Commit;
+with Eml_Config;
+with Eml_Git_Commit;
 
-package body Elm.Info is
+package body Eml.Info is
 
    function Program_Name return String is
    begin
-      return "elm";
+      return "eml";
    end Program_Name;
 
    function Author return String is
@@ -15,12 +15,12 @@ package body Elm.Info is
 
    function Version return String is
    begin
-      return Elm_Config.Crate_Version;
+      return Eml_Config.Crate_Version;
    end Version;
 
    function Git_Commit return String is
    begin
-      return Elm_Git_Commit.Commit;
+      return Eml_Git_Commit.Commit;
    end Git_Commit;
 
-end Elm.Info;
+end Eml.Info;

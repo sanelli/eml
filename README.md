@@ -1,6 +1,6 @@
-# elm
+# eml
 
-ELM compiler and interpreter that converts mathematical expressions into ELM
+EML compiler and interpreter that converts mathematical expressions into EML
 expressions and executes them.
 
 ## Requirements
@@ -21,31 +21,31 @@ alr build
 
 This produces:
 
-- `bin/elm` — compiler / interpreter executable
-- `bin/elm_tests` — in-repo tests
+- `bin/eml` — compiler / interpreter executable
+- `bin/eml_tests` — in-repo tests
 
 Compiler switches treat **warnings as errors** and enable full style and
-runtime checks (see `alire.toml` `[build-switches]` and `.cursor/rules/elm-build.mdc`).
+runtime checks (see `alire.toml` `[build-switches]` and `.cursor/rules/eml-build.mdc`).
 
 ## Run
 
 ```powershell
 alr run
 # or
-./bin/elm --no-logo tokenize -i path/to/file.telm
-./bin/elm --no-logo parse -i path/to/file.telm
+./bin/eml --no-logo tokenize -i path/to/file.teml
+./bin/eml --no-logo parse -i path/to/file.teml
 ```
 
 ### Tokenize
 
 ```powershell
-./bin/elm tokenize -i filename.telm
-./bin/elm tokenize -i filename.telm -o other.tokens
-./bin/elm --no-logo tokenize -i filename.telm -o other.tokens
-./bin/elm tokenize --no-color -i filename.telm
+./bin/eml tokenize -i filename.teml
+./bin/eml tokenize -i filename.teml -o other.tokens
+./bin/eml --no-logo tokenize -i filename.teml -o other.tokens
+./bin/eml tokenize --no-color -i filename.teml
 ```
 
-- `-i` / `--input` — required `.telm` file
+- `-i` / `--input` — required `.teml` file
 - `-o` / `--output` — optional `.tokens` file; omit to write tokens to stdout
 - `--no-logo` — suppress the stdout banner (use for pure dumps / pipes)
 - `--no-color` — plain stderr diagnostics (no ANSI red)
@@ -56,15 +56,15 @@ still emitted. Exit status is `0` on success and `1` on CLI, I/O, or lex errors.
 ### Parse
 
 ```powershell
-./bin/elm parse -i filename.telm
-./bin/elm parse -i filename.telm -o other.syntaxtree
-./bin/elm parse -i filename.telm -of md -o other.md
-./bin/elm parse -i filename.telm -of dot -o other.dot
-./bin/elm parse -i filename.telm -of svg -o other.svg
-./bin/elm --no-logo parse -i filename.telm
+./bin/eml parse -i filename.teml
+./bin/eml parse -i filename.teml -o other.syntaxtree
+./bin/eml parse -i filename.teml -of md -o other.md
+./bin/eml parse -i filename.teml -of dot -o other.dot
+./bin/eml parse -i filename.teml -of svg -o other.svg
+./bin/eml --no-logo parse -i filename.teml
 ```
 
-- `-i` / `--input` — required `.telm` file
+- `-i` / `--input` — required `.teml` file
 - `-o` / `--output` — optional dump file; omit to write to stdout
 - `-of` / `--output-format` — `mermaid` (default), `md`, `dot`, or `svg`
 - Output extension must match the format (`.syntaxtree`, `.md`, `.dot`, `.svg`)
@@ -75,7 +75,7 @@ on success and `1` on CLI, I/O, lex, or parse errors.
 
 ## Samples
 
-`.telm` examples live under [`samples/`](samples/), including precedence stress
+`.teml` examples live under [`samples/`](samples/), including precedence stress
 cases (`16_`–`25_`). Run them with:
 
 ```powershell
@@ -98,29 +98,29 @@ any sample fails.
 ## Test
 
 ```powershell
-alr run -- elm_tests
+alr run -- eml_tests
 # or
-./bin/elm_tests
+./bin/eml_tests
 ```
 
-Coverage includes regex automata, `.telm` tokenization, expression parsing
-(precedence and errors), tree emitters, and `elm tokenize` / `elm parse` CLI
+Coverage includes regex automata, `.teml` tokenization, expression parsing
+(precedence and errors), tree emitters, and `eml tokenize` / `eml parse` CLI
 happy/negative paths.
 
 ## Layout
 
 | Path | Role |
 |------|------|
-| `src/elm.ads` | Root `Elm` package |
-| `src/elm-main.adb` | Main procedure (`Elm.Main` → binary `elm`) |
-| `src/elm-cli.*` | CLI (`tokenize`, `parse`, banner, flags) |
-| `src/elm-info.*` | Program name / author / version / commit |
+| `src/eml.ads` | Root `Eml` package |
+| `src/eml-main.adb` | Main procedure (`Eml.Main` → binary `eml`) |
+| `src/eml-cli.*` | CLI (`tokenize`, `parse`, banner, flags) |
+| `src/eml-info.*` | Program name / author / version / commit |
 | `src/regex_automata.*` | In-repo regex → NFA library |
-| `src/expr_tokenizer.*` | `.telm` tokenizer |
-| `src/expr_parser.*` | `.telm` parser and tree emitters |
-| `src/elm_tokenizer.*` | `.elm` tokenizer stub |
-| `src/elm_parser.*` | `.elm` parser stub |
-| `src/ir_elm.*` | Shared IR ELM stub |
+| `src/expr_tokenizer.*` | `.teml` tokenizer |
+| `src/expr_parser.*` | `.teml` parser and tree emitters |
+| `src/eml_tokenizer.*` | `.eml` tokenizer stub |
+| `src/eml_parser.*` | `.eml` parser stub |
+| `src/ir_eml.*` | Shared IR EML stub |
 | `src/interpreter.*` | Interpreter stub |
 | `tests/` | Regex, tokenizer, parser, and CLI tests |
 | `scripts/embed_git_commit.ps1` | Pre-build short-hash embed |

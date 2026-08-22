@@ -1,0 +1,38 @@
+---
+description: EML textual format, operator definition, and grammar
+alwaysApply: true
+---
+
+# EML format
+
+Canonical reference: `docs/All elementary functions from a single operator.html`.
+
+## Operator
+
+```
+eml(x, y) = exp(x) - ln(y)
+```
+
+Paired with the constant `1` (`ln(1) = 0`), this generates the scientific-calculator basis (arithmetic, elementary functions, and constants such as `e`, `pi`, `i`).
+
+## Textual grammar
+
+Closed programs are a binary tree of `eml` and `1`. Parameterized programs also allow `$VARNAME` leaves (bound by `eml run`):
+
+```
+S → 1 | $VARNAME | eml(S, S)
+```
+
+A `.eml` file is EML text. Without variables it contains only `eml(...)` and `1`.
+
+## Identities (from the paper; write `eml`, matching the paper)
+
+- `e = eml(1, 1)`
+- `exp(x) = eml(x, 1)`
+- `ln(z) = eml(1, eml(eml(1, z), 1))`
+
+Further rewrites (arithmetic, trig, constants, …) come from that paper. Prefer its identities over ad-hoc equivalents unless a later optimization pass says otherwise.
+
+## Interpreter
+
+The same executable interprets EML by evaluating the `eml` tree over complex numbers. Do not require LLVM / .NET / JVM to interpret.

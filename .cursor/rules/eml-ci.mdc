@@ -19,7 +19,7 @@ Treat compile + tests as the merge gate. When coverage reporting exists, include
 
 ## Releases
 
-Creating a **GitHub Release** builds and attaches an `elm` executable.
+Creating a **GitHub Release** builds and attaches an `eml` executable.
 
 **TBC:** whether that build can be **cross-compiled** for Linux, macOS, and Windows. Do not assume a matrix of OS binaries until that is decided.
 

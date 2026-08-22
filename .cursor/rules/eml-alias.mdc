@@ -1,0 +1,22 @@
+---
+description: When the user says elm they mean eml; do not rename the clone folder
+alwaysApply: true
+---
+
+# elm means eml
+
+The product, operator, files, and CLI are **EML** / `eml`. The paper calls the operator `eml` (Exp-Minus-Log).
+
+If the user says **elm**, **ELM**, **.elm**, **.telm**, or `elm …` in chat, interpret that as **eml**, **EML**, **.eml**, **.teml**, or `eml …` unless they clearly mean something else.
+
+## Keep these as elm
+
+- The local clone folder name (this checkout may stay `elm`)
+- Anything outside this repository
+- Historical plan files under `.cursor/plans/` (audit trail; do not rewrite them for this rename)
+
+## Examples
+
+- “run elm tokenize on that .telm” → `eml tokenize` on a `.teml` file
+- “IR ELM” / `elm(x, y)` → IR EML / `eml(x, y)`
+- “add a test in elm_tests” → `tests/eml_tests.adb`

@@ -1,0 +1,163 @@
+---
+description: eml CLI commands, flags, file extensions, and variable bindings
+alwaysApply: true
+---
+
+# Command line
+
+The Ada executable is invoked as `eml`. Front-end is chosen from the **input extension**: `.teml` (source expression) or `.eml` (EML text).
+
+## Global options
+
+- `--no-color` — plain-text diagnostics and usage on stderr (no ANSI red). Allowed before or after the subcommand.
+- `--no-logo` — suppress the startup banner. Allowed before or after the subcommand.
+
+## `help`
+
+```
+eml help
+eml help tokenize
+eml help parse
+```
+
+- `eml help` — usage, command list, and common options on stdout; exit `0`
+- `eml help tokenize` — tokenize-specific usage and options on stdout; exit `0`
+- `eml help parse` — parse-specific usage and options on stdout; exit `0`
+- Unknown topic → stderr error + usage, exit `1`
+- Banner is still printed unless `--no-logo` is set
+
+## Startup banner
+
+Unless `--no-logo` is set, `eml` prints a short banner to **stdout** (never stderr, never the `--output` file):
+
+```
+eml  <version>
+Author: Stefano Anelli
+Commit: <short-hash>
+```
+
+With `--output`/`-o`, the banner still goes to stdout while command output goes only to the file. Without `-o`, stdout is the banner (unless `--no-logo`) then the dump; use `--no-logo` for a pure dump (pipes, tests).
+
+## `tokenize`
+
+Dump the token stream. Input is required; output is optional.
+
+```
+eml tokenize --input|-i <file.teml> [--output|-o <file.tokens>] [--no-color] [--no-logo]
+```
+
+- `--input` / `-i` — required; must end in `.teml` (this stage; `.eml` tokenize comes later)
+- `--output` / `-o` — optional; if present must end in `.tokens`; if omitted, the dump goes to stdout
+- Flag order after `tokenize` is free; space-separated only (no `--input=`)
+
+### `.tokens` dump format
+
+One token per line, no header, no EOF token, no skipped whitespace:
+
+```
+<line>:<column> <KIND> <lexeme>
+```
+
+`line` and `column` are 1-based. Invalid tokens are not written to the dump.
+
+### Errors and exit codes
+
+- Invalid CLI → short error + usage on stderr (red unless `--no-color`), plus a hint to try `eml help`, exit `1`
+- Missing command (e.g. `eml --input f.teml` with no command) → `error: missing command (expected help, tokenize, or parse); got '--input'` (or without `; got …` when no args), exit `1`
+- Lex errors → human-readable lines on stderr (`error: invalid token at line N, column M: …`), continue scanning, still emit valid tokens, exit `1`
+- I/O failure → stderr diagnostic, exit `1`
+- Success (zero invalid tokens) → exit `0`
+- `eml help` / `eml help tokenize` → help on stdout, exit `0`
+
+Usage text (errors):
+
+```
+Usage:
+  eml <command> [options]
+  eml help [command]
+  eml tokenize --input|-i <file.teml> [--output|-o <file.tokens>] [--no-color] [--no-logo]
+  eml parse --input|-i <file.teml> [--output|-o <file>] [--output-format|-of mermaid|md|dot|svg] [--no-color] [--no-logo]
+Try 'eml help' for more information.
+```
+
+Examples:
+
+```
+eml tokenize --input filename.teml --output other.tokens
+eml tokenize -i filename.teml
+eml tokenize --no-logo -i filename.teml -o other.tokens
+```
+
+`.eml` tokenize is not implemented yet; treating a `.eml` input as tokenize is invalid CLI for now.
+
+## `parse`
+
+Tokenize a `.teml` file, then build a syntax tree with standard mathematical operator precedence and parentheses. Dump the tree.
+
+```
+eml parse --input|-i <file.teml> [--output|-o <file>] [--output-format|-of mermaid|md|dot|svg] [--no-color] [--no-logo]
+```
+
+- `--input` / `-i` — required; must end in `.teml` (this stage; `.eml` parse comes later)
+- `--output` / `-o` — optional; if omitted, the dump goes to stdout
+- `--output-format` / `-of` — optional; default `mermaid`. Values: `mermaid`, `md`, `dot`, `svg`
+- Flag order after `parse` is free; space-separated only (no `--input=` / `--output-format=`)
+- Parse `-of` / `--output-format` as their own flags so `-of` is never treated as `-o`
+
+### Output format vs extension
+
+When `-o` is present, the extension **must match** the selected format:
+
+| `-of` | `-o` extension | Contents |
+|---|---|---|
+| `mermaid` (default) | `.syntaxtree` | Raw Mermaid `flowchart TD` |
+| `md` | `.md` | Markdown with a fenced Mermaid block |
+| `dot` | `.dot` | Graphviz `digraph` |
+| `svg` | `.svg` | Self-drawn SVG (no Graphviz) |
+
+Mismatch is invalid CLI. Without `-o`, the same format is written to stdout.
+
+Pipeline: read file → tokenize → if lex errors, report and stop (no tree) → parse → if parse error, report and stop (no tree) → emit.
+
+Parse errors stop at the first error:
+
+```
+error: parse error at line <line>, column <column>: <reason>
+```
+
+Exit `0` on success; `1` on invalid CLI, I/O, lex, or parse errors.
+
+`eml help parse` — parse-specific usage on stdout; exit `0`.
+
+`.eml` parse is not implemented yet; treating a `.eml` input as parse is invalid CLI for now.
+
+Examples:
+
+```
+eml parse -i filename.teml
+eml parse -i filename.teml -o other.syntaxtree
+eml parse -i filename.teml -o other.md -of md
+eml parse --no-logo -i filename.teml -of svg -o other.svg
+```
+
+## `compile`
+
+```
+eml compile --input filename.teml --output other.eml
+eml compile --input filename.teml --output other.dll --format=cli
+eml compile --input filename.teml --output other.bytecode --format=bytecode
+eml compile --input filename.teml --output other --format=binary
+```
+
+`--format` values: `cli` (.NET CLI DLL), `bytecode` (Java), `binary` (LLVM native). EML text is implied by output `*.eml` (no `--format` in the examples). `.teml` and `.eml` inputs are both valid; pick the matching tokenizer/parser.
+
+## `run`
+
+Interpret. Bind variables as extra arguments `$NAME:VALUE`. `VALUE` is a source constant (decimal, scientific, `i`, `e`, `pi`, `phi`, …).
+
+```
+eml run --input filename.teml $VAR1:1.345 $VAR2:i $VAR3:e $VAR4:99
+eml run --input filename.eml $VAR1:1.345 $VAR2:i $VAR3:e $VAR4:99
+```
+
+Do not invent extra subcommands or flags beyond this surface unless the user asks.

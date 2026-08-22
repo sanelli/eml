@@ -1,0 +1,25 @@
+---
+description: VS Code language extension for .teml and .eml files
+alwaysApply: true
+---
+
+# VS Code extension
+
+A **second product** of this repo is a Visual Studio Code extension for the EML languages (`.teml` and `.eml`). It is **not** the Ada compiler; implement it only when the user asks for that chunk.
+
+Follow the VS Code language-extension model: [Language Extensions Overview](https://code.visualstudio.com/api/language-extensions/overview).
+
+## In-scope (declarative, unless later specified)
+
+- Syntax highlighting (TextMate grammar)
+- Bracket matching
+- Bracket autoclosing and **autosurrounding**
+- Other language-configuration basics as they fit `.teml` / `.eml` (indentation, comments if introduced)
+
+Programmatic features (language server, completions, diagnostics, go-to-definition) are **out of scope** until requested.
+
+## Constraints
+
+- Register both file types: source `.teml` and EML `.eml`.
+- Highlighting must distinguish `eml(...)`, `1`, constants, `$VARNAME`, operators, and functions in `.teml` (including hyperbolic `sinh`, `cosh`, `tanh` alongside `sin`, `cos`, `tan`, `log`, `sqrt`).
+- Do not couple the extension to LLVM / .NET / JVM backends.

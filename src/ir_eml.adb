@@ -1,8 +1,8 @@
-package body IR_Elm is
+package body IR_Eml is
 
    function Name return String is
    begin
-      return "ir_elm";
+      return "ir_eml";
    end Name;
 
-end IR_Elm;
+end IR_Eml;

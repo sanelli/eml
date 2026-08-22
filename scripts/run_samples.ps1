@@ -1,4 +1,4 @@
-# Run elm front-end operation(s) on every sample under samples/.
+# Run eml front-end operation(s) on every sample under samples/.
 #
 # Usage:
 #   pwsh -File scripts/run_samples.ps1
@@ -28,7 +28,7 @@ param(
 $ErrorActionPreference = "Continue"
 $Root = Split-Path -Parent $PSScriptRoot
 $SamplesDir = Join-Path $Root "samples"
-$Elm = Join-Path $Root "bin" "elm"
+$Eml = Join-Path $Root "bin" "eml"
 $AllOperations = @("tokenize", "parse")
 
 function Expand-OperationList {
@@ -94,8 +94,8 @@ else {
     $Operations = Expand-OperationList -Items @($Collected)
 }
 
-if (-not (Test-Path -LiteralPath $Elm)) {
-    Write-Error "elm executable not found at '$Elm'. Run 'alr build' first."
+if (-not (Test-Path -LiteralPath $Eml)) {
+    Write-Error "eml executable not found at '$Eml'. Run 'alr build' first."
     exit 1
 }
 
@@ -104,9 +104,9 @@ if (-not (Test-Path -LiteralPath $SamplesDir)) {
     exit 1
 }
 
-$Samples = @(Get-ChildItem -LiteralPath $SamplesDir -Filter "*.telm" | Sort-Object Name)
+$Samples = @(Get-ChildItem -LiteralPath $SamplesDir -Filter "*.teml" | Sort-Object Name)
 if ($Samples.Count -eq 0) {
-    Write-Error "no .telm samples found in '$SamplesDir'."
+    Write-Error "no .teml samples found in '$SamplesDir'."
     exit 1
 }
 
@@ -126,7 +126,7 @@ function Invoke-TokenizeSamples {
         $OutPath = Join-Path $ResultsDir $OutName
         Write-Host "tokenize $($Sample.Name) -> .results/tokenize/$OutName"
 
-        & $script:Elm --no-logo --no-color tokenize -i $Sample.FullName -o $OutPath
+        & $script:Eml --no-logo --no-color tokenize -i $Sample.FullName -o $OutPath
         $Code = $LASTEXITCODE
         if ($Code -ne 0) {
             Write-Host "FAIL: $($Sample.Name) (exit $Code)"
@@ -155,7 +155,7 @@ function Invoke-ParseAllFormats {
         $OutPath = Join-Path $ResultsDir $OutName
         Write-Host "parse $($Sample.Name) -of $($Fmt.Of) -> .results/parse/$OutName"
 
-        & $script:Elm --no-logo --no-color parse -i $Sample.FullName -of $Fmt.Of -o $OutPath
+        & $script:Eml --no-logo --no-color parse -i $Sample.FullName -of $Fmt.Of -o $OutPath
         $Code = $LASTEXITCODE
         if ($Code -ne 0) {
             Write-Host "FAIL: $($Sample.Name) format $($Fmt.Of) (exit $Code)"

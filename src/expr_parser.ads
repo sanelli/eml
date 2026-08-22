@@ -1,4 +1,4 @@
---  Parse .telm tokens into a syntax tree and emit dumps.
+--  Parse .teml tokens into a syntax tree and emit dumps.
 with Ada.Strings.Unbounded;
 with Expr_Tokenizer;
 

@@ -1,5 +1,5 @@
-name = "elm"
-description = "ELM compiler and interpreter"
+name = "eml"
+description = "EML compiler and interpreter"
 version = "0.1.0-dev"
 
 authors = ["Stefano Anelli"]
@@ -7,9 +7,9 @@ maintainers = ["Stefano Anelli <redacted@redacted.com>"]
 maintainers-logins = ["sanelli"]
 licenses = "MIT"
 website = ""
-tags = ["elm", "compiler", "interpreter"]
+tags = ["eml", "compiler", "interpreter"]
 
-executables = ["elm", "elm_tests"]
+executables = ["eml", "eml_tests"]
 
 [[actions]]
 type = "pre-build"

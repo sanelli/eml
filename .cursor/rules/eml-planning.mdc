@@ -19,8 +19,8 @@ Do **not** start implementing a new feature until a **plan** exists for it. The 
 Example:
 
 ```
-Steps:  1. Add regex lexer  2. Tokenize .telm  3. Tests for lexer
-TODOs:  1. Add regex lexer  2. Tokenize .telm  3. Tests for lexer
+Steps:  1. Add regex lexer  2. Tokenize .teml  3. Tests for lexer
+TODOs:  1. Add regex lexer  2. Tokenize .teml  3. Tests for lexer
 ```
 
 ## Branch
@@ -40,4 +40,4 @@ Before working the plan, check the current git branch.
 
 ## After the plan
 
-Wait for the user to instruct which step/chunk to implement. Then follow `elm-process`.
+Wait for the user to instruct which step/chunk to implement. Then follow `eml-process`.

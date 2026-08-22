@@ -17,8 +17,8 @@ Configure strictness in [`alire.toml`](alire.toml) via `[build-switches]` so Ali
 - `contracts = "Yes"`
 - `ada_version = "Ada2022"`
 
-Do not relax these switches to silence problems. Fix the code instead. The GPR must use `Elm_Config.Ada_Compiler_Switches` (or equivalent) and must not override them with a weaker set.
+Do not relax these switches to silence problems. Fix the code instead. The GPR must use `Eml_Config.Ada_Compiler_Switches` (or equivalent) and must not override them with a weaker set.
 
 ## Scope
 
-Applies to the `elm` executable, library units, and in-repo test binaries alike.
+Applies to the `eml` executable, library units, and in-repo test binaries alike.

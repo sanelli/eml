@@ -1,7 +1,7 @@
 with Ada.Command_Line;
 with Ada.Strings.Unbounded;
 
-package Elm.CLI is
+package Eml.CLI is
 
    package US renames Ada.Strings.Unbounded;
 
@@ -16,4 +16,4 @@ package Elm.CLI is
    procedure Run;
    --  Run using Ada.Command_Line arguments and set the process exit status.
 
-end Elm.CLI;
+end Eml.CLI;

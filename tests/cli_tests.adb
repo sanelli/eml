@@ -4,8 +4,8 @@ with Ada.Strings.Fixed;
 with Ada.Strings.Unbounded;
 with Ada.Text_IO;
 
-with Elm.CLI;
-with Elm.Info;
+with Eml.CLI;
+with Eml.Info;
 
 package body CLI_Tests is
 
@@ -58,10 +58,10 @@ package body CLI_Tests is
    begin
       declare
          In_Path  : constant String :=
-           Write_Temp ("cli_ok.telm", "sin(pi+$X)");
+           Write_Temp ("cli_ok.teml", "sin(pi+$X)");
          Out_Path : constant String :=
            Ada.Directories.Compose (Temp_Dir, "cli_ok.tokens");
-         Args     : constant Elm.CLI.Arg_Array :=
+         Args     : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("tokenize"),
             A ("-i"),
@@ -69,7 +69,7 @@ package body CLI_Tests is
             A ("-o"),
             A (Out_Path)];
          Status   : constant Ada.Command_Line.Exit_Status :=
-           Elm.CLI.Run (Args);
+           Eml.CLI.Run (Args);
          Expected : constant String :=
            "1:1 FUNCTION sin"
            & ASCII.LF
@@ -89,10 +89,10 @@ package body CLI_Tests is
 
       declare
          In_Path  : constant String :=
-           Write_Temp ("cli_long.telm", "1+2");
+           Write_Temp ("cli_long.teml", "1+2");
          Out_Path : constant String :=
            Ada.Directories.Compose (Temp_Dir, "cli_long.tokens");
-         Args     : constant Elm.CLI.Arg_Array :=
+         Args     : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("tokenize"),
             A ("--output"),
@@ -100,7 +100,7 @@ package body CLI_Tests is
             A ("--input"),
             A (In_Path)];
          Status   : constant Ada.Command_Line.Exit_Status :=
-           Elm.CLI.Run (Args);
+           Eml.CLI.Run (Args);
       begin
          Require (Status = Ada.Command_Line.Success, "cli-long: exit");
          Require
@@ -112,10 +112,10 @@ package body CLI_Tests is
       end;
 
       declare
-         In_Path  : constant String := Write_Temp ("cli_empty.telm", "");
+         In_Path  : constant String := Write_Temp ("cli_empty.teml", "");
          Out_Path : constant String :=
            Ada.Directories.Compose (Temp_Dir, "cli_empty.tokens");
-         Args     : constant Elm.CLI.Arg_Array :=
+         Args     : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("tokenize"),
             A ("-i"),
@@ -123,7 +123,7 @@ package body CLI_Tests is
             A ("-o"),
             A (Out_Path)];
          Status   : constant Ada.Command_Line.Exit_Status :=
-           Elm.CLI.Run (Args);
+           Eml.CLI.Run (Args);
       begin
          Require (Status = Ada.Command_Line.Success, "cli-empty: exit");
          Require (Read_All (Out_Path) = "", "cli-empty: dump");
@@ -131,10 +131,10 @@ package body CLI_Tests is
 
       declare
          In_Path  : constant String :=
-           Write_Temp ("cli_bad.telm", "1+@2");
+           Write_Temp ("cli_bad.teml", "1+@2");
          Out_Path : constant String :=
            Ada.Directories.Compose (Temp_Dir, "cli_bad.tokens");
-         Args     : constant Elm.CLI.Arg_Array :=
+         Args     : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("--no-color"),
             A ("tokenize"),
@@ -143,7 +143,7 @@ package body CLI_Tests is
             A ("-o"),
             A (Out_Path)];
          Status   : constant Ada.Command_Line.Exit_Status :=
-           Elm.CLI.Run (Args);
+           Eml.CLI.Run (Args);
       begin
          Require (Status = Ada.Command_Line.Failure, "cli-bad: exit");
          Require
@@ -155,12 +155,12 @@ package body CLI_Tests is
       end;
 
       declare
-         Args   : constant Elm.CLI.Arg_Array :=
+         Args   : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("--no-color"),
             A ("tokenize")];
          Status : constant Ada.Command_Line.Exit_Status :=
-           Elm.CLI.Run (Args);
+           Eml.CLI.Run (Args);
       begin
          Require
            (Status = Ada.Command_Line.Failure, "cli-missing-i: exit");
@@ -168,10 +168,10 @@ package body CLI_Tests is
 
       declare
          In_Path  : constant String :=
-           Write_Temp ("cli_parse_ok.telm", "1+2*3");
+           Write_Temp ("cli_parse_ok.teml", "1+2*3");
          Out_Path : constant String :=
            Ada.Directories.Compose (Temp_Dir, "cli_parse_ok.syntaxtree");
-         Args     : constant Elm.CLI.Arg_Array :=
+         Args     : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("parse"),
             A ("-i"),
@@ -179,7 +179,7 @@ package body CLI_Tests is
             A ("-o"),
             A (Out_Path)];
          Status   : constant Ada.Command_Line.Exit_Status :=
-           Elm.CLI.Run (Args);
+           Eml.CLI.Run (Args);
          Expected : constant String :=
            "flowchart TD"
            & ASCII.LF
@@ -207,10 +207,10 @@ package body CLI_Tests is
 
       declare
          In_Path  : constant String :=
-           Write_Temp ("cli_parse_md.telm", "1+2");
+           Write_Temp ("cli_parse_md.teml", "1+2");
          Out_Path : constant String :=
            Ada.Directories.Compose (Temp_Dir, "cli_parse_md.md");
-         Args     : constant Elm.CLI.Arg_Array :=
+         Args     : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("parse"),
             A ("--input"),
@@ -220,7 +220,7 @@ package body CLI_Tests is
             A ("--output-format"),
             A ("md")];
          Status   : constant Ada.Command_Line.Exit_Status :=
-           Elm.CLI.Run (Args);
+           Eml.CLI.Run (Args);
          Body_Txt : constant String := Read_All (Out_Path);
       begin
          Require (Status = Ada.Command_Line.Success, "cli-parse-md: exit");
@@ -234,10 +234,10 @@ package body CLI_Tests is
 
       declare
          In_Path  : constant String :=
-           Write_Temp ("cli_parse_dot.telm", "1+2");
+           Write_Temp ("cli_parse_dot.teml", "1+2");
          Out_Path : constant String :=
            Ada.Directories.Compose (Temp_Dir, "cli_parse_dot.dot");
-         Args     : constant Elm.CLI.Arg_Array :=
+         Args     : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("parse"),
             A ("-i"),
@@ -247,7 +247,7 @@ package body CLI_Tests is
             A ("-o"),
             A (Out_Path)];
          Status   : constant Ada.Command_Line.Exit_Status :=
-           Elm.CLI.Run (Args);
+           Eml.CLI.Run (Args);
       begin
          Require
            (Status = Ada.Command_Line.Success, "cli-parse-dot: exit");
@@ -259,10 +259,10 @@ package body CLI_Tests is
 
       declare
          In_Path  : constant String :=
-           Write_Temp ("cli_parse_svg.telm", "1+2");
+           Write_Temp ("cli_parse_svg.teml", "1+2");
          Out_Path : constant String :=
            Ada.Directories.Compose (Temp_Dir, "cli_parse_svg.svg");
-         Args     : constant Elm.CLI.Arg_Array :=
+         Args     : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("parse"),
             A ("-i"),
@@ -272,7 +272,7 @@ package body CLI_Tests is
             A ("-o"),
             A (Out_Path)];
          Status   : constant Ada.Command_Line.Exit_Status :=
-           Elm.CLI.Run (Args);
+           Eml.CLI.Run (Args);
       begin
          Require
            (Status = Ada.Command_Line.Success, "cli-parse-svg: exit");
@@ -283,8 +283,8 @@ package body CLI_Tests is
 
       declare
          In_Path : constant String :=
-           Write_Temp ("cli_parse_badext.telm", "1");
-         Args    : constant Elm.CLI.Arg_Array :=
+           Write_Temp ("cli_parse_badext.teml", "1");
+         Args    : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("--no-color"),
             A ("parse"),
@@ -295,7 +295,7 @@ package body CLI_Tests is
             A ("-o"),
             A ("out.md")];
          Status  : constant Ada.Command_Line.Exit_Status :=
-           Elm.CLI.Run (Args);
+           Eml.CLI.Run (Args);
       begin
          Require
            (Status = Ada.Command_Line.Failure, "cli-parse-badext: exit");
@@ -303,8 +303,8 @@ package body CLI_Tests is
 
       declare
          In_Path : constant String :=
-           Write_Temp ("cli_parse_badfmt.telm", "1");
-         Args    : constant Elm.CLI.Arg_Array :=
+           Write_Temp ("cli_parse_badfmt.teml", "1");
+         Args    : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("--no-color"),
             A ("parse"),
@@ -313,7 +313,7 @@ package body CLI_Tests is
             A ("-of"),
             A ("json")];
          Status  : constant Ada.Command_Line.Exit_Status :=
-           Elm.CLI.Run (Args);
+           Eml.CLI.Run (Args);
       begin
          Require
            (Status = Ada.Command_Line.Failure, "cli-parse-badfmt: exit");
@@ -321,11 +321,11 @@ package body CLI_Tests is
 
       declare
          In_Path  : constant String :=
-           Write_Temp ("cli_parse_lex.telm", "1+@2");
+           Write_Temp ("cli_parse_lex.teml", "1+@2");
          Out_Path : constant String :=
            Ada.Directories.Compose
              (Temp_Dir, "cli_parse_lex.syntaxtree");
-         Args     : constant Elm.CLI.Arg_Array :=
+         Args     : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("--no-color"),
             A ("parse"),
@@ -338,7 +338,7 @@ package body CLI_Tests is
          if Ada.Directories.Exists (Out_Path) then
             Ada.Directories.Delete_File (Out_Path);
          end if;
-         Status := Elm.CLI.Run (Args);
+         Status := Eml.CLI.Run (Args);
          Require
            (Status = Ada.Command_Line.Failure, "cli-parse-lex: exit");
          Require
@@ -348,11 +348,11 @@ package body CLI_Tests is
 
       declare
          In_Path  : constant String :=
-           Write_Temp ("cli_parse_err.telm", "1+");
+           Write_Temp ("cli_parse_err.teml", "1+");
          Out_Path : constant String :=
            Ada.Directories.Compose
              (Temp_Dir, "cli_parse_err.syntaxtree");
-         Args     : constant Elm.CLI.Arg_Array :=
+         Args     : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("--no-color"),
             A ("parse"),
@@ -365,7 +365,7 @@ package body CLI_Tests is
          if Ada.Directories.Exists (Out_Path) then
             Ada.Directories.Delete_File (Out_Path);
          end if;
-         Status := Elm.CLI.Run (Args);
+         Status := Eml.CLI.Run (Args);
          Require
            (Status = Ada.Command_Line.Failure, "cli-parse-err: exit");
          Require
@@ -375,39 +375,39 @@ package body CLI_Tests is
 
       declare
          In_Path : constant String :=
-           Write_Temp ("cli_parse_elm.elm", "elm(1,1)");
-         Args    : constant Elm.CLI.Arg_Array :=
+           Write_Temp ("cli_parse_eml.eml", "eml(1,1)");
+         Args    : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("--no-color"),
             A ("parse"),
             A ("-i"),
             A (In_Path)];
          Status  : constant Ada.Command_Line.Exit_Status :=
-           Elm.CLI.Run (Args);
+           Eml.CLI.Run (Args);
       begin
          Require
-           (Status = Ada.Command_Line.Failure, "cli-parse-elm: exit");
+           (Status = Ada.Command_Line.Failure, "cli-parse-eml: exit");
       end;
 
       declare
          In_Path : constant String :=
-           Write_Temp ("cli_elm.elm", "elm(1,1)");
-         Args    : constant Elm.CLI.Arg_Array :=
+           Write_Temp ("cli_eml.eml", "eml(1,1)");
+         Args    : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("--no-color"),
             A ("tokenize"),
             A ("-i"),
             A (In_Path)];
          Status  : constant Ada.Command_Line.Exit_Status :=
-           Elm.CLI.Run (Args);
+           Eml.CLI.Run (Args);
       begin
-         Require (Status = Ada.Command_Line.Failure, "cli-elm: exit");
+         Require (Status = Ada.Command_Line.Failure, "cli-eml: exit");
       end;
 
       declare
          In_Path : constant String :=
-           Write_Temp ("cli_outext.telm", "1");
-         Args    : constant Elm.CLI.Arg_Array :=
+           Write_Temp ("cli_outext.teml", "1");
+         Args    : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("--no-color"),
             A ("tokenize"),
@@ -416,80 +416,80 @@ package body CLI_Tests is
             A ("-o"),
             A ("out.txt")];
          Status  : constant Ada.Command_Line.Exit_Status :=
-           Elm.CLI.Run (Args);
+           Eml.CLI.Run (Args);
       begin
          Require (Status = Ada.Command_Line.Failure, "cli-outext: exit");
       end;
 
       declare
-         Args   : constant Elm.CLI.Arg_Array :=
+         Args   : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("--no-color"),
             A ("tokenize"),
             A ("-i"),
-            A ("obj/does_not_exist.telm")];
+            A ("obj/does_not_exist.teml")];
          Status : constant Ada.Command_Line.Exit_Status :=
-           Elm.CLI.Run (Args);
+           Eml.CLI.Run (Args);
       begin
          Require
            (Status = Ada.Command_Line.Failure, "cli-missing-file: exit");
       end;
 
-      Require (Elm.Info.Program_Name = "elm", "info: name");
-      Require (Elm.Info.Author = "Stefano Anelli", "info: author");
-      Require (Elm.Info.Version'Length > 0, "info: version");
-      Require (Elm.Info.Git_Commit'Length > 0, "info: commit");
+      Require (Eml.Info.Program_Name = "eml", "info: name");
+      Require (Eml.Info.Author = "Stefano Anelli", "info: author");
+      Require (Eml.Info.Version'Length > 0, "info: version");
+      Require (Eml.Info.Git_Commit'Length > 0, "info: commit");
 
       declare
-         Args   : constant Elm.CLI.Arg_Array :=
+         Args   : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"), A ("help")];
          Status : constant Ada.Command_Line.Exit_Status :=
-           Elm.CLI.Run (Args);
+           Eml.CLI.Run (Args);
       begin
          Require (Status = Ada.Command_Line.Success, "cli-help: exit");
       end;
 
       declare
-         Args   : constant Elm.CLI.Arg_Array :=
+         Args   : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"), A ("help"), A ("tokenize")];
          Status : constant Ada.Command_Line.Exit_Status :=
-           Elm.CLI.Run (Args);
+           Eml.CLI.Run (Args);
       begin
          Require
            (Status = Ada.Command_Line.Success, "cli-help-tokenize: exit");
       end;
 
       declare
-         Args   : constant Elm.CLI.Arg_Array :=
+         Args   : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"), A ("help"), A ("parse")];
          Status : constant Ada.Command_Line.Exit_Status :=
-           Elm.CLI.Run (Args);
+           Eml.CLI.Run (Args);
       begin
          Require
            (Status = Ada.Command_Line.Success, "cli-help-parse: exit");
       end;
 
       declare
-         Args   : constant Elm.CLI.Arg_Array :=
+         Args   : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("--no-color"),
             A ("help"),
             A ("compile")];
          Status : constant Ada.Command_Line.Exit_Status :=
-           Elm.CLI.Run (Args);
+           Eml.CLI.Run (Args);
       begin
          Require
            (Status = Ada.Command_Line.Failure, "cli-help-unknown: exit");
       end;
 
       declare
-         Args   : constant Elm.CLI.Arg_Array :=
+         Args   : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("--no-color"),
             A ("--input"),
-            A ("samples/01_trig_basics.telm")];
+            A ("samples/01_trig_basics.teml")];
          Status : constant Ada.Command_Line.Exit_Status :=
-           Elm.CLI.Run (Args);
+           Eml.CLI.Run (Args);
       begin
          Require
            (Status = Ada.Command_Line.Failure, "cli-missing-cmd: exit");
