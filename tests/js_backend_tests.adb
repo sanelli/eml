@@ -114,6 +114,19 @@ package body Js_Backend_Tests is
       end;
 
       declare
+         Text : constant String :=
+           Format_Js (E_Tree, Test_Meta, "run");
+         Html : constant String := Format_Html ("out.js", "run");
+      begin
+         Require (Has (Text, "function run() {"), "js: renamed fn");
+         Require
+           (not Has (Text, "function main() {"),
+            "js: no default main");
+         Require
+           (Has (Html, "math.format(run())"), "html: renamed call");
+      end;
+
+      declare
          Path : constant String :=
            Companion_Html_Path ("/tmp/foo.js");
       begin

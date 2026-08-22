@@ -1,3 +1,4 @@
+with Ada.Characters.Handling;
 with Ada.Calendar;
 with Ada.Exceptions;
 with Ada.Streams.Stream_IO;
@@ -120,7 +121,8 @@ package body Eml.CLI is
       Emit_Error_Line
         ("  eml compile "
          & Common_Options
-         & " [--output-format|-of eml|beml|js|c|clib]",
+         & " [--output-format|-of eml|beml|js|c|clib]"
+         & " [--function-name|-fn NAME] [--emit-eml]",
          Use_Color);
       Emit_Error_Line
         ("  eml run "
@@ -320,7 +322,8 @@ package body Eml.CLI is
       Put_Stdout
         ("  eml compile "
          & Common_Options
-         & " [--output-format|-of eml|beml|js|c|clib]");
+         & " [--output-format|-of eml|beml|js|c|clib]"
+         & " [--function-name|-fn NAME] [--emit-eml]");
       Put_Stdout ("");
       Put_Stdout ("Options:");
       Put_Stdout
@@ -333,6 +336,12 @@ package body Eml.CLI is
         ("  --output-format, -of FMT    beml (default), eml, js, c, "
          & "or clib");
       Put_Stdout
+        ("  --function-name, -fn NAME   Entry function for -of js "
+         & "(default main) or clib (default compute)");
+      Put_Stdout
+        ("  --emit-eml                  With -of clib, declare eml "
+         & "in the companion .h");
+      Put_Stdout
         ("  --var, -v $NAME=EXPR        Preprocessor binding "
          & "(mxeml/teml only)");
       Put_Stdout ("");
@@ -342,7 +351,7 @@ package body Eml.CLI is
       Put_Stdout ("  js   -> .js (writes companion .html beside -o)");
       Put_Stdout ("  c    -> .c (standalone program with main)");
       Put_Stdout
-        ("  clib -> .c (writes companion .h with eml+compute)");
+        ("  clib -> .c (writes companion .h; compute by default)");
       Put_Stdout ("");
       Put_Stdout
         ("Compiling eml to eml or beml to beml is rejected "
@@ -350,7 +359,7 @@ package body Eml.CLI is
       Put_Stdout
         ("-of js emits browser JavaScript (math.js) and, "
          & "when -o is set, a companion .html that loads "
-         & "the script and shows main().");
+         & "the script and shows the entry function.");
       Put_Stdout
         ("Without -o, only the JavaScript goes to stdout "
          & "(no HTML).");
@@ -359,7 +368,8 @@ package body Eml.CLI is
          & "(long double complex).");
       Put_Stdout
         ("-of clib emits a C library .c; with -o also writes "
-         & "a companion .h (eml + compute).");
+         & "a companion .h (entry function; eml only with "
+         & "--emit-eml).");
       Put_Stdout
         ("Without -o, only the clib .c goes to stdout (no .h).");
       Put_Stdout ("");
@@ -368,8 +378,12 @@ package body Eml.CLI is
       Put_Stdout ("  eml compile -i f.eml -of beml -o out.beml");
       Put_Stdout ("  eml --no-logo compile -if mxeml < in.mxeml -of eml");
       Put_Stdout ("  eml compile -i f.mxeml -of js -o out.js");
+      Put_Stdout ("  eml compile -i f.mxeml -of js -fn run -o out.js");
       Put_Stdout ("  eml compile -i f.mxeml -of c -o out.c");
       Put_Stdout ("  eml compile -i f.mxeml -of clib -o out.c");
+      Put_Stdout
+        ("  eml compile -i f.mxeml -of clib -fn eval --emit-eml "
+         & "-o out.c");
    end Put_Compile_Help;
 
    procedure Put_Run_Help is
@@ -1269,12 +1283,38 @@ package body Eml.CLI is
       end;
    end Run_Parse_Beml;
 
+   function Valid_Function_Name (S : String) return Boolean is
+   begin
+      if S'Length = 0 then
+         return False;
+      end if;
+      declare
+         First : constant Character := S (S'First);
+      begin
+         if not (Ada.Characters.Handling.Is_Letter (First)
+           or else First = '_')
+         then
+            return False;
+         end if;
+      end;
+      for C of S (S'First + 1 .. S'Last) loop
+         if not (Ada.Characters.Handling.Is_Alphanumeric (C)
+           or else C = '_')
+         then
+            return False;
+         end if;
+      end loop;
+      return True;
+   end Valid_Function_Name;
+
    procedure Write_Compile_Output
-     (IR          : IR_Eml.Node_Access;
-      Meta        : IR_Eml.Dump_Meta;
-      Output_Path : String;
-      Has_Output  : Boolean;
-      Fmt         : Compile_Output_Format)
+     (IR            : IR_Eml.Node_Access;
+      Meta          : IR_Eml.Dump_Meta;
+      Output_Path   : String;
+      Has_Output    : Boolean;
+      Fmt           : Compile_Output_Format;
+      Function_Name : String;
+      Emit_Eml      : Boolean)
    is
    begin
       case Fmt is
@@ -1291,12 +1331,20 @@ package body Eml.CLI is
                IR_Eml.Write_Beml_To_Stdout (IR, Meta);
             end if;
          when Javascript =>
-            if Has_Output then
-               Js_Backend.Write_Js_To_File (IR, Meta, Output_Path);
-               Js_Backend.Write_Html_To_File (Output_Path);
-            else
-               Js_Backend.Write_Js_To_Stdout (IR, Meta);
-            end if;
+            declare
+               Fn : constant String :=
+                 (if Function_Name'Length = 0
+                  then Js_Backend.Default_Function_Name
+                  else Function_Name);
+            begin
+               if Has_Output then
+                  Js_Backend.Write_Js_To_File
+                    (IR, Meta, Output_Path, Fn);
+                  Js_Backend.Write_Html_To_File (Output_Path, Fn);
+               else
+                  Js_Backend.Write_Js_To_Stdout (IR, Meta, Fn);
+               end if;
+            end;
          when C_Program =>
             if Has_Output then
                C_Backend.Write_C_Program_To_File
@@ -1305,11 +1353,20 @@ package body Eml.CLI is
                C_Backend.Write_C_Program_To_Stdout (IR, Meta);
             end if;
          when C_Lib =>
-            if Has_Output then
-               C_Backend.Write_C_Lib_To_File (IR, Meta, Output_Path);
-            else
-               C_Backend.Write_C_Lib_To_Stdout (IR, Meta);
-            end if;
+            declare
+               Fn : constant String :=
+                 (if Function_Name'Length = 0
+                  then C_Backend.Default_Lib_Function_Name
+                  else Function_Name);
+            begin
+               if Has_Output then
+                  C_Backend.Write_C_Lib_To_File
+                    (IR, Meta, Output_Path, Fn, Emit_Eml);
+               else
+                  C_Backend.Write_C_Lib_To_Stdout
+                    (IR, Meta, Fn, Emit_Eml);
+               end if;
+            end;
       end case;
    end Write_Compile_Output;
 
@@ -1450,16 +1507,18 @@ package body Eml.CLI is
    end Load_IR;
 
    function Run_Emlir
-     (Source_Label : String;
-      In_Fmt       : Input_Format;
-      Source       : String;
-      Bin_Data     : Ada.Streams.Stream_Element_Array;
-      Output_Path  : String;
-      Has_Output   : Boolean;
-      Fmt          : Compile_Output_Format;
-      Bindings     : Binding_Array;
-      Warn         : Warn_Mode;
-      Use_Color    : Boolean) return Ada.Command_Line.Exit_Status
+     (Source_Label  : String;
+      In_Fmt        : Input_Format;
+      Source        : String;
+      Bin_Data      : Ada.Streams.Stream_Element_Array;
+      Output_Path   : String;
+      Has_Output    : Boolean;
+      Fmt           : Compile_Output_Format;
+      Bindings      : Binding_Array;
+      Warn          : Warn_Mode;
+      Use_Color     : Boolean;
+      Function_Name : String;
+      Emit_Eml      : Boolean) return Ada.Command_Line.Exit_Status
    is
       Meta : constant IR_Eml.Dump_Meta :=
         (Source_Path => To_Unbounded_String (Source_Label),
@@ -1473,7 +1532,14 @@ package body Eml.CLI is
       if Status /= Ada.Command_Line.Success then
          return Status;
       end if;
-      Write_Compile_Output (Root, Meta, Output_Path, Has_Output, Fmt);
+      Write_Compile_Output
+        (Root,
+         Meta,
+         Output_Path,
+         Has_Output,
+         Fmt,
+         Function_Name,
+         Emit_Eml);
       return Ada.Command_Line.Success;
    end Run_Emlir;
 
@@ -1553,6 +1619,9 @@ package body Eml.CLI is
       Have_Warn          : Boolean := False;
       Have_Sub           : Boolean := False;
       Have_Topic         : Boolean := False;
+      Have_Function_Name : Boolean := False;
+      Have_Emit_Eml      : Boolean := False;
+      Function_Name_Text : Unbounded_String;
       I                  : Positive := 1;
       Use_Color          : Boolean;
       Cmd                : Unbounded_String;
@@ -1749,6 +1818,34 @@ package body Eml.CLI is
                Warn_Text := Args (I + 1);
                Have_Warn := True;
                I := I + 2;
+            elsif A = "--function-name" or else A = "-fn" then
+               if Have_Function_Name then
+                  if not No_Logo then
+                     Put_Banner;
+                  end if;
+                  Fail_CLI (CLI_Repeated_Function_Name, not No_Color);
+                  return Ada.Command_Line.Failure;
+               end if;
+               if I = Args'Last then
+                  if not No_Logo then
+                     Put_Banner;
+                  end if;
+                  Fail_CLI (CLI_Missing_Flag_Value, not No_Color, A);
+                  return Ada.Command_Line.Failure;
+               end if;
+               Function_Name_Text := Args (I + 1);
+               Have_Function_Name := True;
+               I := I + 2;
+            elsif A = "--emit-eml" then
+               if Have_Emit_Eml then
+                  if not No_Logo then
+                     Put_Banner;
+                  end if;
+                  Fail_CLI (CLI_Repeated_Emit_Eml, not No_Color);
+                  return Ada.Command_Line.Failure;
+               end if;
+               Have_Emit_Eml := True;
+               I := I + 1;
             else
                if not No_Logo then
                   Put_Banner;
@@ -1785,6 +1882,8 @@ package body Eml.CLI is
            or else Have_Output_Format
            or else Binding_Count > 0
            or else Have_Warn
+           or else Have_Function_Name
+           or else Have_Emit_Eml
          then
             Fail_CLI (CLI_Unexpected_Argument, Use_Color, "--input");
             return Ada.Command_Line.Failure;
@@ -1822,6 +1921,25 @@ package body Eml.CLI is
         and then To_String (Cmd) /= "run"
       then
          Fail_CLI (CLI_Unknown_Command, Use_Color, To_String (Cmd));
+         return Ada.Command_Line.Failure;
+      end if;
+
+      if Have_Function_Name then
+         if To_String (Cmd) /= "compile" then
+            Fail_CLI (CLI_Function_Name_Not_Allowed, Use_Color);
+            return Ada.Command_Line.Failure;
+         end if;
+         if not Valid_Function_Name (To_String (Function_Name_Text)) then
+            Fail_CLI
+              (CLI_Invalid_Function_Name,
+               Use_Color,
+               To_String (Function_Name_Text));
+            return Ada.Command_Line.Failure;
+         end if;
+      end if;
+
+      if Have_Emit_Eml and then To_String (Cmd) /= "compile" then
+         Fail_CLI (CLI_Emit_Eml_Not_Allowed, Use_Color);
          return Ada.Command_Line.Failure;
       end if;
 
@@ -2219,6 +2337,19 @@ package body Eml.CLI is
             end if;
          end if;
 
+         if Have_Function_Name
+           and then Compile_Fmt /= Javascript
+           and then Compile_Fmt /= C_Lib
+         then
+            Fail_CLI (CLI_Function_Name_Not_Allowed, Use_Color);
+            return Ada.Command_Line.Failure;
+         end if;
+
+         if Have_Emit_Eml and then Compile_Fmt /= C_Lib then
+            Fail_CLI (CLI_Emit_Eml_Not_Allowed, Use_Color);
+            return Ada.Command_Line.Failure;
+         end if;
+
          if (In_Fmt = Stack_Eml and then Compile_Fmt = Eml_Text)
            or else (In_Fmt = Beml and then Compile_Fmt = Beml_Binary)
          then
@@ -2263,7 +2394,9 @@ package body Eml.CLI is
                         Compile_Fmt,
                         Binds,
                         Warn,
-                        Use_Color);
+                        Use_Color,
+                        To_String (Function_Name_Text),
+                        Have_Emit_Eml);
                   end;
 
                when Beml =>
@@ -2285,7 +2418,9 @@ package body Eml.CLI is
                         Compile_Fmt,
                         Binds,
                         Warn,
-                        Use_Color);
+                        Use_Color,
+                        To_String (Function_Name_Text),
+                        Have_Emit_Eml);
                   end;
             end case;
          exception

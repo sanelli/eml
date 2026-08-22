@@ -161,16 +161,19 @@ browser JavaScript (`.js`), or emit C (`.c` / library `.c`+`.h`):
 - Same-format compile is an error (`eml`→`eml`, `beml`→`beml`)
 - `--format` / `-f` is rejected; use `-of`
 - `-of js` writes a classic browser script that defines `eml(x, y)` with
-  [math.js](https://mathjs.org/) (`math.exp` / `math.log`) and a `main()` that
+  [math.js](https://mathjs.org/) (`math.exp` / `math.log`) and an entry
+  function (default `main`, override with `--function-name`/`-fn`) that
   returns nested `eml(...)` calls matching the IR tree. When `-o out.js` is
   set, a companion `out.html` is written beside it (loads the pinned math.js
-  CDN bundle and `out.js`, then shows `math.format(main())`). Without `-o`,
+  CDN bundle and `out.js`, then shows `math.format(<entry>())`). Without `-o`,
   only the JavaScript goes to stdout.
 - `-of c` writes a standalone C program using `<complex.h>` and
   `long double complex` (`cexpl` / `clogl`), with `main` printing the result.
-- `-of clib` writes a C library `.c` defining `eml` and `compute`. When `-o`
-  is set, also writes a companion `.h` with those declarations. Without `-o`,
-  only the `.c` goes to stdout.
+- `-of clib` writes a C library `.c` defining `eml` and an entry function
+  (default `compute`, override with `-fn`). When `-o` is set, also writes a
+  companion `.h` with the entry prototype; add `--emit-eml` to also declare
+  `eml` in the header (otherwise `eml` is `static` in the `.c` only). Without
+  `-o`, only the `.c` goes to stdout.
 - **Future (not implemented yet):** compile targets **`wasm`** and **`wat`**
   (textual WebAssembly).
 

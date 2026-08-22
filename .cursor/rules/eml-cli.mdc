@@ -172,7 +172,7 @@ Usage:
   eml preproc [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo] [--output-format|-of mxeml|teml]
   eml tokenize [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo] [--output-format|-of tokens]
   eml parse [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo] [--output-format|-of mermaid|md|dot|svg]
-  eml compile [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo] [--output-format|-of eml|beml|js|c|clib]
+  eml compile [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo] [--output-format|-of eml|beml|js|c|clib] [--function-name|-fn NAME] [--emit-eml]
   eml run [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
 Try 'eml help' for more information.
 ```
@@ -242,15 +242,17 @@ eml parse --no-logo -i filename.mxeml -of svg -o other.svg
 Lower / reconstruct to IR EML and write textual `.eml`, binary `.beml`, browser JavaScript `.js`, or C (`.c` / library `.c`+`.h`).
 
 ```
-eml compile [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--output-format|-of eml|beml|js|c|clib] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
+eml compile [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--output-format|-of eml|beml|js|c|clib] [--function-name|-fn NAME] [--emit-eml] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
 ```
 
 - Effective input may be any of the four formats
 - `-o` / `--output` — optional; extension must match `--output-format` (default `beml` → `.beml`); omit → stdout
 - `--output-format` / `-of` — optional; default `beml`; values `eml`, `beml`, `js`, `c`, or `clib`
+- `--function-name` / `-fn NAME` — optional; only with `-of js` (renames entry, default `main`) or `-of clib` (renames entry, default `compute`); identifier: letter/`_` then alnum/`_`; invalid elsewhere
+- `--emit-eml` — optional switch; only with `-of clib`; when set, declare `eml` in the companion `.h` (otherwise omit from `.h` and keep `eml` `static` in `.c`)
 - `--var` / `--warn` / `--no-color` / `--no-logo` — same shared rules
 - Flag order free; space-separated only (no `--output-format=`)
-- Repeated `--output-format` is invalid CLI
+- Repeated `--output-format`, `-fn`, or `--emit-eml` is invalid CLI
 - `eml help compile` → usage on stdout, exit `0`
 - Unknown `-of` values (including future `cli`, `bytecode`, `binary`, `wasm`, `wat`, and the spelling `javascript`) are invalid CLI
 - Exit `0` on success; `1` on invalid CLI, I/O, preprocess, lex, parse, or same-format errors
@@ -274,19 +276,21 @@ Output extension must match format:
 
 ### JavaScript (`-of js`)
 
-- Emits a classic browser script: header `//` comments, `function eml(x, y)` using math.js (`math.subtract(math.exp(x), math.log(y))`), and `function main()` returning nested `eml(...)` / `math.complex(1, 0)` from the IR tree (no Flatten, no top-level `main()` call)
-- When `-o` is set, also writes a companion `.html` beside the `.js` (same basename) that loads a pinned math.js CDN bundle, then the generated `.js` (simple filename in `<script src>`), and displays `math.format(main())` in the body
+- Emits a classic browser script: header `//` comments, `function eml(x, y)` using math.js (`math.subtract(math.exp(x), math.log(y))`), and `function <entry>()` (default `main`, or `-fn`) returning nested `eml(...)` / `math.complex(1, 0)` from the IR tree (no Flatten, no top-level entry call)
+- When `-o` is set, also writes a companion `.html` beside the `.js` (same basename) that loads a pinned math.js CDN bundle, then the generated `.js` (simple filename in `<script src>`), and displays `math.format(<entry>())` in the body
 - Without `-o`, only the JavaScript goes to stdout (no HTML)
 
 ### C program (`-of c`)
 
 - Emits a standalone C source: `/*` header comments, `#include <complex.h>` / `<stdio.h>`, `static long double complex eml(...)` using `cexpl` / `clogl`, and `int main(void)` that evaluates the nested IR expression and prints with `printf("%Lf%+Lfi\n", creall(z), cimagl(z))`
-- No companion files; `-o` optional (stdout if omitted)
+- No companion files; `-o` optional (stdout if omitted); `-fn` / `--emit-eml` are invalid with `-of c`
 
 ### C library (`-of clib`)
 
-- Emits a library `.c` defining non-static `eml` and `compute` (nested IR return); **no** `main`
-- When `-o` is set, also writes a companion `.h` (same basename) with include guard, `#include <complex.h>`, and prototypes for `eml` / `compute`; the `.c` `#include`s that header by simple name
+- Emits a library `.c` defining `eml` and an entry function (default `compute`, or `-fn`) returning the nested IR expression; **no** `main`
+- Default: `eml` is **`static`** in the `.c` and **omitted** from the `.h`
+- With `--emit-eml`: `eml` is non-static in the `.c` and declared in the `.h`
+- When `-o` is set, also writes a companion `.h` (same basename) with include guard, `#include <complex.h>`, and the entry prototype (plus `eml` iff `--emit-eml`); the `.c` `#include`s that header by simple name
 - Without `-o`, only the `.c` goes to stdout (include name `eml_generated.h`; no header file written)
 
 Pipeline (by format):
@@ -307,8 +311,10 @@ eml compile -i filename.mxeml -o other.eml -of eml
 eml --no-logo compile -if mxeml < in.mxeml -of eml
 eml compile -i f.mxeml -v '$X=1' -w none -o out.beml
 eml compile -i f.mxeml -of js -o out.js
+eml compile -i f.mxeml -of js -fn run -o out.js
 eml compile -i f.mxeml -of c -o out.c
 eml compile -i f.mxeml -of clib -o out.c
+eml compile -i f.mxeml -of clib -fn eval --emit-eml -o out.c
 ```
 
 Native / .NET / JVM / wasm / wat backends (`-of cli`, `bytecode`, `binary`, `wasm`, `wat`) are not implemented yet.

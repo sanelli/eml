@@ -84,7 +84,9 @@ package body C_Backend is
    function Format_C_Lib
      (Root                : Node_Access;
       Meta                : Dump_Meta;
-      Header_Include_Name : String) return String
+      Header_Include_Name : String;
+      Function_Name       : String := Default_Lib_Function_Name;
+      Emit_Eml            : Boolean := False) return String
    is
       Buffer : Unbounded_String := Null_Unbounded_String;
    begin
@@ -93,15 +95,24 @@ package body C_Backend is
       Append_Line
         (Buffer, "#include """ & Header_Include_Name & """");
       Append_Line (Buffer, "");
-      Append_Line
-        (Buffer,
-         "long double complex eml"
-         & "(long double complex x, long double complex y)");
+      if Emit_Eml then
+         Append_Line
+           (Buffer,
+            "long double complex eml"
+            & "(long double complex x, long double complex y)");
+      else
+         Append_Line
+           (Buffer,
+            "static long double complex eml"
+            & "(long double complex x, long double complex y)");
+      end if;
       Append_Line (Buffer, "{");
       Append_Line (Buffer, "  return cexpl(x) - clogl(y);");
       Append_Line (Buffer, "}");
       Append_Line (Buffer, "");
-      Append_Line (Buffer, "long double complex compute(void)");
+      Append_Line
+        (Buffer,
+         "long double complex " & Function_Name & "(void)");
       Append_Line (Buffer, "{");
       Append_Line (Buffer, "  return " & Format_Expr (Root) & ";");
       Append_Line (Buffer, "}");
@@ -109,7 +120,11 @@ package body C_Backend is
       return To_String (Buffer);
    end Format_C_Lib;
 
-   function Format_C_Header (Guard_Name : String) return String is
+   function Format_C_Header
+     (Guard_Name    : String;
+      Function_Name : String := Default_Lib_Function_Name;
+      Emit_Eml      : Boolean := False) return String
+   is
       Buffer : Unbounded_String := Null_Unbounded_String;
    begin
       Append_Line (Buffer, "#ifndef " & Guard_Name);
@@ -117,12 +132,15 @@ package body C_Backend is
       Append_Line (Buffer, "");
       Append_Line (Buffer, "#include <complex.h>");
       Append_Line (Buffer, "");
+      if Emit_Eml then
+         Append_Line
+           (Buffer,
+            "long double complex eml"
+            & "(long double complex x, long double complex y);");
+      end if;
       Append_Line
         (Buffer,
-         "long double complex eml"
-         & "(long double complex x, long double complex y);");
-      Append_Line
-        (Buffer, "long double complex compute(void);");
+         "long double complex " & Function_Name & "(void);");
       Append_Line (Buffer, "");
       Append_Line (Buffer, "#endif /* " & Guard_Name & " */");
       Append (Buffer, ASCII.LF);
@@ -187,7 +205,11 @@ package body C_Backend is
    end Write_C_Program_To_Stdout;
 
    procedure Write_C_Lib_To_File
-     (Root : Node_Access; Meta : Dump_Meta; Path : String)
+     (Root          : Node_Access;
+      Meta          : Dump_Meta;
+      Path          : String;
+      Function_Name : String := Default_Lib_Function_Name;
+      Emit_Eml      : Boolean := False)
    is
       H_Path : constant String := Companion_Header_Path (Path);
       H_Name : constant String :=
@@ -196,16 +218,24 @@ package body C_Backend is
         Header_Guard (Ada.Directories.Base_Name (Path));
    begin
       Write_Text_File
-        (Path, Format_C_Lib (Root, Meta, H_Name));
-      Write_Text_File (H_Path, Format_C_Header (Guard));
+        (Path,
+         Format_C_Lib
+           (Root, Meta, H_Name, Function_Name, Emit_Eml));
+      Write_Text_File
+        (H_Path,
+         Format_C_Header (Guard, Function_Name, Emit_Eml));
    end Write_C_Lib_To_File;
 
    procedure Write_C_Lib_To_Stdout
-     (Root : Node_Access; Meta : Dump_Meta)
+     (Root          : Node_Access;
+      Meta          : Dump_Meta;
+      Function_Name : String := Default_Lib_Function_Name;
+      Emit_Eml      : Boolean := False)
    is
    begin
       Write_Text_Stdout
-        (Format_C_Lib (Root, Meta, "eml_generated.h"));
+        (Format_C_Lib
+           (Root, Meta, "eml_generated.h", Function_Name, Emit_Eml));
    end Write_C_Lib_To_Stdout;
 
 end C_Backend;

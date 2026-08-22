@@ -85,8 +85,23 @@ package body C_Backend_Tests is
             "clib: compute body");
          Require (not Has (Text, "int main"), "clib: no main");
          Require
-           (not Has (Text, "static long double complex eml"),
-            "clib: eml not static");
+           (Has (Text, "static long double complex eml"),
+            "clib: eml static default");
+      end;
+
+      declare
+         Text : constant String :=
+           Format_C_Lib
+             (E_Tree, Test_Meta, "out.h", "eval", True);
+      begin
+         Require
+           (Has (Text, "long double complex eval(void)"),
+            "clib: renamed entry");
+         Require
+           (Has (Text, "long double complex eml")
+            and then not Has
+              (Text, "static long double complex eml"),
+            "clib: eml exported");
       end;
 
       declare
@@ -95,15 +110,27 @@ package body C_Backend_Tests is
          Require (Has (Hdr, "#ifndef OUT_H"), "hdr: ifndef");
          Require (Has (Hdr, "#define OUT_H"), "hdr: define");
          Require
+           (not Has (Hdr, "long double complex eml"),
+            "hdr: no eml default");
+         Require
+           (Has (Hdr, "long double complex compute(void);"),
+            "hdr: compute proto");
+         Require (Has (Hdr, "#include <complex.h>"), "hdr: complex");
+      end;
+
+      declare
+         Hdr : constant String :=
+           Format_C_Header ("OUT_H", "eval", True);
+      begin
+         Require
            (Has
               (Hdr,
                "long double complex eml"
                & "(long double complex x, long double complex y);"),
             "hdr: eml proto");
          Require
-           (Has (Hdr, "long double complex compute(void);"),
-            "hdr: compute proto");
-         Require (Has (Hdr, "#include <complex.h>"), "hdr: complex");
+           (Has (Hdr, "long double complex eval(void);"),
+            "hdr: renamed proto");
       end;
 
       declare

@@ -3,18 +3,25 @@ with IR_Eml;
 
 package C_Backend is
 
+   Default_Lib_Function_Name : constant String := "compute";
+
    function Format_C_Program
      (Root : IR_Eml.Node_Access; Meta : IR_Eml.Dump_Meta) return String;
    --  Standalone .c with static eml and main that prints the result.
 
    function Format_C_Lib
-     (Root               : IR_Eml.Node_Access;
-      Meta               : IR_Eml.Dump_Meta;
-      Header_Include_Name : String) return String;
-   --  Library .c with #include "Header_Include_Name", eml, and compute.
+     (Root                : IR_Eml.Node_Access;
+      Meta                : IR_Eml.Dump_Meta;
+      Header_Include_Name : String;
+      Function_Name       : String := Default_Lib_Function_Name;
+      Emit_Eml            : Boolean := False) return String;
+   --  Library .c with #include, eml (static unless Emit_Eml), and entry fn.
 
-   function Format_C_Header (Guard_Name : String) return String;
-   --  Companion .h with eml and compute declarations.
+   function Format_C_Header
+     (Guard_Name    : String;
+      Function_Name : String := Default_Lib_Function_Name;
+      Emit_Eml      : Boolean := False) return String;
+   --  Companion .h; emits eml prototype only when Emit_Eml.
 
    function Companion_Header_Path (C_Path : String) return String;
    --  Same directory and basename as C_Path, with .h extension.
@@ -29,11 +36,18 @@ package C_Backend is
      (Root : IR_Eml.Node_Access; Meta : IR_Eml.Dump_Meta);
 
    procedure Write_C_Lib_To_File
-     (Root : IR_Eml.Node_Access; Meta : IR_Eml.Dump_Meta; Path : String);
+     (Root          : IR_Eml.Node_Access;
+      Meta          : IR_Eml.Dump_Meta;
+      Path          : String;
+      Function_Name : String := Default_Lib_Function_Name;
+      Emit_Eml      : Boolean := False);
    --  Writes .c and companion .h beside Path.
 
    procedure Write_C_Lib_To_Stdout
-     (Root : IR_Eml.Node_Access; Meta : IR_Eml.Dump_Meta);
+     (Root          : IR_Eml.Node_Access;
+      Meta          : IR_Eml.Dump_Meta;
+      Function_Name : String := Default_Lib_Function_Name;
+      Emit_Eml      : Boolean := False);
    --  Library .c only (include name "eml_generated.h"); no header file.
 
 end C_Backend;

@@ -625,11 +625,11 @@ function Write-CompileFormatRow {
             elseif ($CText -match "int main") {
                 $FailDetail = "clib should not have main"
             }
-            elseif ($HText -notmatch "eml\(") {
-                $FailDetail = "hdr missing eml"
-            }
             elseif ($HText -notmatch "compute") {
                 $FailDetail = "hdr missing compute"
+            }
+            elseif ($HText -match "long double complex eml") {
+                $FailDetail = "hdr should not emit eml by default"
             }
         }
         if ($null -ne $FailDetail) {

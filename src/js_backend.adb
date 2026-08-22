@@ -36,7 +36,9 @@ package body Js_Backend is
    end Format_Expr;
 
    function Format_Js
-     (Root : Node_Access; Meta : Dump_Meta) return String
+     (Root          : Node_Access;
+      Meta          : Dump_Meta;
+      Function_Name : String := Default_Function_Name) return String
    is
       Buffer : Unbounded_String := Null_Unbounded_String;
    begin
@@ -54,14 +56,17 @@ package body Js_Backend is
          "  return math.subtract(math.exp(x), math.log(y));");
       Append_Line (Buffer, "}");
       Append_Line (Buffer, "");
-      Append_Line (Buffer, "function main() {");
+      Append_Line (Buffer, "function " & Function_Name & "() {");
       Append_Line (Buffer, "  return " & Format_Expr (Root) & ";");
       Append_Line (Buffer, "}");
       Append (Buffer, ASCII.LF);
       return To_String (Buffer);
    end Format_Js;
 
-   function Format_Html (Js_File_Name : String) return String is
+   function Format_Html
+     (Js_File_Name  : String;
+      Function_Name : String := Default_Function_Name) return String
+   is
       Buffer : Unbounded_String := Null_Unbounded_String;
    begin
       Append_Line (Buffer, "<!DOCTYPE html>");
@@ -82,7 +87,9 @@ package body Js_Backend is
       Append_Line
         (Buffer,
          "    document.getElementById(""result"").textContent "
-         & "= math.format(main());");
+         & "= math.format("
+         & Function_Name
+         & "());");
       Append_Line (Buffer, "  </script>");
       Append_Line (Buffer, "</body>");
       Append_Line (Buffer, "</html>");
@@ -100,18 +107,27 @@ package body Js_Backend is
    end Companion_Html_Path;
 
    procedure Write_Js_To_File
-     (Root : Node_Access; Meta : Dump_Meta; Path : String)
+     (Root          : Node_Access;
+      Meta          : Dump_Meta;
+      Path          : String;
+      Function_Name : String := Default_Function_Name)
    is
       File : Ada.Text_IO.File_Type;
-      Text : constant String := Format_Js (Root, Meta);
+      Text : constant String :=
+        Format_Js (Root, Meta, Function_Name);
    begin
       Ada.Text_IO.Create (File, Ada.Text_IO.Out_File, Path);
       Ada.Text_IO.Put (File, Text);
       Ada.Text_IO.Close (File);
    end Write_Js_To_File;
 
-   procedure Write_Js_To_Stdout (Root : Node_Access; Meta : Dump_Meta) is
-      Text : constant String := Format_Js (Root, Meta);
+   procedure Write_Js_To_Stdout
+     (Root          : Node_Access;
+      Meta          : Dump_Meta;
+      Function_Name : String := Default_Function_Name)
+   is
+      Text : constant String :=
+        Format_Js (Root, Meta, Function_Name);
    begin
       Ada.Text_IO.Put (Ada.Text_IO.Standard_Output, Text);
       if Text'Length = 0 or else Text (Text'Last) /= ASCII.LF then
@@ -119,10 +135,14 @@ package body Js_Backend is
       end if;
    end Write_Js_To_Stdout;
 
-   procedure Write_Html_To_File (Js_Path : String) is
+   procedure Write_Html_To_File
+     (Js_Path       : String;
+      Function_Name : String := Default_Function_Name)
+   is
       File : Ada.Text_IO.File_Type;
       Text : constant String :=
-        Format_Html (Ada.Directories.Simple_Name (Js_Path));
+        Format_Html
+          (Ada.Directories.Simple_Name (Js_Path), Function_Name);
       Path : constant String := Companion_Html_Path (Js_Path);
    begin
       Ada.Text_IO.Create (File, Ada.Text_IO.Out_File, Path);

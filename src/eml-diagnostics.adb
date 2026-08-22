@@ -92,6 +92,22 @@ package body Eml.Diagnostics is
             return "run does not accept --output/-o";
          when CLI_Run_Rejects_Output_Format =>
             return "run does not accept --output-format/-of";
+         when CLI_Repeated_Function_Name =>
+            return "repeated --function-name/-fn";
+         when CLI_Invalid_Function_Name =>
+            return
+              "invalid --function-name/-fn '"
+              & Param1
+              & "' (expected a C/JS identifier)";
+         when CLI_Function_Name_Not_Allowed =>
+            return
+              "--function-name/-fn is only allowed for "
+              & "compile -of js or clib";
+         when CLI_Repeated_Emit_Eml =>
+            return "repeated --emit-eml";
+         when CLI_Emit_Eml_Not_Allowed =>
+            return
+              "--emit-eml is only allowed for compile -of clib";
          when CLI_Input_Format_Required =>
             return
               "missing --input-format/-if "

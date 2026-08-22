@@ -33,6 +33,11 @@ package Eml.Diagnostics is
    CLI_Unexpected_Format_Flag         : constant Diagnostic_Id := 25;
    CLI_Run_Rejects_Output             : constant Diagnostic_Id := 26;
    CLI_Run_Rejects_Output_Format      : constant Diagnostic_Id := 27;
+   CLI_Repeated_Function_Name         : constant Diagnostic_Id := 28;
+   CLI_Invalid_Function_Name          : constant Diagnostic_Id := 29;
+   CLI_Function_Name_Not_Allowed      : constant Diagnostic_Id := 30;
+   CLI_Repeated_Emit_Eml              : constant Diagnostic_Id := 31;
+   CLI_Emit_Eml_Not_Allowed           : constant Diagnostic_Id := 32;
 
    --  Preprocessor (00100-00199)
    PP_Unbound_Variable                : constant Diagnostic_Id := 100;
