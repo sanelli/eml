@@ -172,7 +172,7 @@ Usage:
   eml preproc [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo] [--output-format|-of mxeml|teml]
   eml tokenize [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo] [--output-format|-of tokens]
   eml parse [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo] [--output-format|-of mermaid|md|dot|svg]
-  eml compile [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo] [--output-format|-of eml|beml|js]
+  eml compile [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo] [--output-format|-of eml|beml|js|c|clib]
   eml run [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
 Try 'eml help' for more information.
 ```
@@ -239,20 +239,20 @@ eml parse --no-logo -i filename.mxeml -of svg -o other.svg
 
 ## `compile`
 
-Lower / reconstruct to IR EML and write textual `.eml`, binary `.beml`, or browser JavaScript `.js`.
+Lower / reconstruct to IR EML and write textual `.eml`, binary `.beml`, browser JavaScript `.js`, or C (`.c` / library `.c`+`.h`).
 
 ```
-eml compile [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--output-format|-of eml|beml|js] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
+eml compile [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--output-format|-of eml|beml|js|c|clib] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
 ```
 
 - Effective input may be any of the four formats
 - `-o` / `--output` — optional; extension must match `--output-format` (default `beml` → `.beml`); omit → stdout
-- `--output-format` / `-of` — optional; default `beml`; values `eml`, `beml`, or `js`
+- `--output-format` / `-of` — optional; default `beml`; values `eml`, `beml`, `js`, `c`, or `clib`
 - `--var` / `--warn` / `--no-color` / `--no-logo` — same shared rules
 - Flag order free; space-separated only (no `--output-format=`)
 - Repeated `--output-format` is invalid CLI
 - `eml help compile` → usage on stdout, exit `0`
-- Unknown `-of` values (including future `cli`, `bytecode`, `binary`, and the spelling `javascript`) are invalid CLI
+- Unknown `-of` values (including future `cli`, `bytecode`, `binary`, `wasm`, `wat`, and the spelling `javascript`) are invalid CLI
 - Exit `0` on success; `1` on invalid CLI, I/O, preprocess, lex, parse, or same-format errors
 
 ### Same-format compile (rejected)
@@ -260,7 +260,7 @@ eml compile [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--outp
 - effective input `eml` and `-of eml` → error, stop, no output
 - effective input `beml` and `-of beml` → error, stop, no output (including default `-of beml` on a `.beml` input)
 - `mxeml` / `teml` → any compile output is allowed
-- `eml` → `beml` / `js` and `beml` → `eml` / `js` are conversions
+- `eml` → `beml` / `js` / `c` / `clib` and `beml` → `eml` / `js` / `c` / `clib` are conversions
 
 Output extension must match format:
 
@@ -269,6 +269,8 @@ Output extension must match format:
 | `beml` (default) | `.beml` |
 | `eml` | `.eml` |
 | `js` | `.js` |
+| `c` | `.c` |
+| `clib` | `.c` |
 
 ### JavaScript (`-of js`)
 
@@ -276,12 +278,23 @@ Output extension must match format:
 - When `-o` is set, also writes a companion `.html` beside the `.js` (same basename) that loads a pinned math.js CDN bundle, then the generated `.js` (simple filename in `<script src>`), and displays `math.format(main())` in the body
 - Without `-o`, only the JavaScript goes to stdout (no HTML)
 
+### C program (`-of c`)
+
+- Emits a standalone C source: `/*` header comments, `#include <complex.h>` / `<stdio.h>`, `static long double complex eml(...)` using `cexpl` / `clogl`, and `int main(void)` that evaluates the nested IR expression and prints with `printf("%Lf%+Lfi\n", creall(z), cimagl(z))`
+- No companion files; `-o` optional (stdout if omitted)
+
+### C library (`-of clib`)
+
+- Emits a library `.c` defining non-static `eml` and `compute` (nested IR return); **no** `main`
+- When `-o` is set, also writes a companion `.h` (same basename) with include guard, `#include <complex.h>`, and prototypes for `eml` / `compute`; the `.c` `#include`s that header by simple name
+- Without `-o`, only the `.c` goes to stdout (include name `eml_generated.h`; no header file written)
+
 Pipeline (by format):
 
 - **mxeml** — preprocess → tokenize → parse AST → lower to IR → encode
 - **teml** — preprocess → teml tokenize/parse → IR → encode
-- **eml** — eml tokenize/parse → IR → encode (as beml or js only, given same-format rule)
-- **beml** — beml reader / unflatten → IR → encode (as eml or js only, given same-format rule)
+- **eml** — eml tokenize/parse → IR → encode (as beml / js / c / clib only, given same-format rule)
+- **beml** — beml reader / unflatten → IR → encode (as eml / js / c / clib only, given same-format rule)
 
 Stop with no output file on unbound/`--warn error`, lex, parse, or same-format errors.
 
@@ -294,9 +307,11 @@ eml compile -i filename.mxeml -o other.eml -of eml
 eml --no-logo compile -if mxeml < in.mxeml -of eml
 eml compile -i f.mxeml -v '$X=1' -w none -o out.beml
 eml compile -i f.mxeml -of js -o out.js
+eml compile -i f.mxeml -of c -o out.c
+eml compile -i f.mxeml -of clib -o out.c
 ```
 
-Native / .NET / JVM backends (`-of cli`, `bytecode`, `binary`) are not implemented yet.
+Native / .NET / JVM / wasm / wat backends (`-of cli`, `bytecode`, `binary`, `wasm`, `wat`) are not implemented yet.
 
 ## `run`
 

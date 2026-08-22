@@ -16,6 +16,7 @@ with Expr_Tokenizer;
 with Interpreter;
 with IR_Eml;
 with Js_Backend;
+with C_Backend;
 
 use type Interpreter.Eval_Status;
 with Teml_Parser;
@@ -38,7 +39,8 @@ package body Eml.CLI is
 
    type Input_Format is (Mxeml, Teml, Stack_Eml, Beml);
 
-   type Compile_Output_Format is (Eml_Text, Beml_Binary, Javascript);
+   type Compile_Output_Format is
+     (Eml_Text, Beml_Binary, Javascript, C_Program, C_Lib);
 
    type Binding_List is array (Positive range <>) of Expr_Preprocessor.Binding;
 
@@ -118,7 +120,7 @@ package body Eml.CLI is
       Emit_Error_Line
         ("  eml compile "
          & Common_Options
-         & " [--output-format|-of eml|beml|js]",
+         & " [--output-format|-of eml|beml|js|c|clib]",
          Use_Color);
       Emit_Error_Line
         ("  eml run "
@@ -154,7 +156,7 @@ package body Eml.CLI is
       Put_Stdout ("  tokenize   Dump the token stream of a source file");
       Put_Stdout ("  parse      Dump the syntax tree of a source file");
       Put_Stdout
-        ("  compile    Lower to .beml, .eml, or .js (+ companion .html)");
+        ("  compile    Lower to .beml, .eml, .js, .c, or clib (.c+.h)");
       Put_Stdout
         ("  run        Evaluate IR EML and print a complex result");
       Put_Stdout ("");
@@ -318,7 +320,7 @@ package body Eml.CLI is
       Put_Stdout
         ("  eml compile "
          & Common_Options
-         & " [--output-format|-of eml|beml|js]");
+         & " [--output-format|-of eml|beml|js|c|clib]");
       Put_Stdout ("");
       Put_Stdout ("Options:");
       Put_Stdout
@@ -328,7 +330,8 @@ package body Eml.CLI is
       Put_Stdout
         ("  --output, -o <file>         Optional output; stdout if omitted");
       Put_Stdout
-        ("  --output-format, -of FMT    beml (default), eml, or js");
+        ("  --output-format, -of FMT    beml (default), eml, js, c, "
+         & "or clib");
       Put_Stdout
         ("  --var, -v $NAME=EXPR        Preprocessor binding "
          & "(mxeml/teml only)");
@@ -337,6 +340,9 @@ package body Eml.CLI is
       Put_Stdout ("  beml -> .beml");
       Put_Stdout ("  eml  -> .eml");
       Put_Stdout ("  js   -> .js (writes companion .html beside -o)");
+      Put_Stdout ("  c    -> .c (standalone program with main)");
+      Put_Stdout
+        ("  clib -> .c (writes companion .h with eml+compute)");
       Put_Stdout ("");
       Put_Stdout
         ("Compiling eml to eml or beml to beml is rejected "
@@ -348,12 +354,22 @@ package body Eml.CLI is
       Put_Stdout
         ("Without -o, only the JavaScript goes to stdout "
          & "(no HTML).");
+      Put_Stdout
+        ("-of c emits a C program using <complex.h> "
+         & "(long double complex).");
+      Put_Stdout
+        ("-of clib emits a C library .c; with -o also writes "
+         & "a companion .h (eml + compute).");
+      Put_Stdout
+        ("Without -o, only the clib .c goes to stdout (no .h).");
       Put_Stdout ("");
       Put_Stdout ("Examples:");
       Put_Stdout ("  eml compile -i filename.mxeml -o other.beml");
       Put_Stdout ("  eml compile -i f.eml -of beml -o out.beml");
       Put_Stdout ("  eml --no-logo compile -if mxeml < in.mxeml -of eml");
       Put_Stdout ("  eml compile -i f.mxeml -of js -o out.js");
+      Put_Stdout ("  eml compile -i f.mxeml -of c -o out.c");
+      Put_Stdout ("  eml compile -i f.mxeml -of clib -o out.c");
    end Put_Compile_Help;
 
    procedure Put_Run_Help is
@@ -702,6 +718,10 @@ package body Eml.CLI is
          return Beml_Binary;
       elsif S = "js" then
          return Javascript;
+      elsif S = "c" then
+         return C_Program;
+      elsif S = "clib" then
+         return C_Lib;
       else
          Ok := False;
          return Beml_Binary;
@@ -714,6 +734,7 @@ package body Eml.CLI is
          when Eml_Text    => return ".eml";
          when Beml_Binary => return ".beml";
          when Javascript  => return ".js";
+         when C_Program | C_Lib => return ".c";
       end case;
    end Compile_Extension;
 
@@ -723,6 +744,8 @@ package body Eml.CLI is
          when Eml_Text    => return "eml";
          when Beml_Binary => return "beml";
          when Javascript  => return "js";
+         when C_Program   => return "c";
+         when C_Lib       => return "clib";
       end case;
    end Compile_Format_Image;
 
@@ -1273,6 +1296,19 @@ package body Eml.CLI is
                Js_Backend.Write_Html_To_File (Output_Path);
             else
                Js_Backend.Write_Js_To_Stdout (IR, Meta);
+            end if;
+         when C_Program =>
+            if Has_Output then
+               C_Backend.Write_C_Program_To_File
+                 (IR, Meta, Output_Path);
+            else
+               C_Backend.Write_C_Program_To_Stdout (IR, Meta);
+            end if;
+         when C_Lib =>
+            if Has_Output then
+               C_Backend.Write_C_Lib_To_File (IR, Meta, Output_Path);
+            else
+               C_Backend.Write_C_Lib_To_Stdout (IR, Meta);
             end if;
       end case;
    end Write_Compile_Output;

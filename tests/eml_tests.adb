@@ -15,6 +15,7 @@ with Expr_Tokenizer_Tests;
 with Interpreter_Tests;
 with IR_Eml_Tests;
 with Js_Backend_Tests;
+with C_Backend_Tests;
 with Regex_Automata_Tests;
 
 procedure Eml_Tests is
@@ -30,6 +31,7 @@ begin
    Expr_Lower_Tests.Run (Failed);
    Interpreter_Tests.Run (Failed);
    Js_Backend_Tests.Run (Failed);
+   C_Backend_Tests.Run (Failed);
    CLI_Tests.Run (Failed);
    Teml_Tokenizer_Tests.Run (Failed);
    Eml_Tokenizer_Tests.Run (Failed);

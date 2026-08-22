@@ -67,6 +67,11 @@ flowchart TD
   irNode --> writeJs["compile -of js"]
   writeJs --> jsFile[.js]
   jsFile --> htmlFile[".html companion when -o"]
+  irNode --> writeC["compile -of c"]
+  writeC --> cMain[".c with main"]
+  irNode --> writeClib["compile -of clib"]
+  writeClib --> cLib[".c eml+compute"]
+  cLib --> cHdr[".h companion when -o"]
   flatten --> stack[Complex stack]
   stack --> stdout["eml run: stdout compact Complex"]
 ```
@@ -75,7 +80,9 @@ flowchart TD
 or tree). `compile` and `run` continue from `IR_Eml.Node`; `run` Flattens to
 opcodes and evaluates on a complex stack (no output file). `-of js` walks the
 IR tree into nested `eml(...)` calls (no Flatten) and, with `-o`, writes a
-companion `.html` that loads math.js and the generated script.
+companion `.html` that loads math.js and the generated script. `-of c` emits a
+standalone C program (`<complex.h>`, `long double complex`); `-of clib` emits
+a library `.c` and, with `-o`, a companion `.h` (`eml` + `compute`).
 
 ## Run
 
@@ -134,8 +141,8 @@ Accepts all four input formats. `-of` / `--output-format`: `mermaid` (default),
 
 ### Compile
 
-Lower to stack-machine IR (`.beml` binary by default, or textual `.eml`), or
-emit browser JavaScript (`.js`):
+Lower to stack-machine IR (`.beml` binary by default, or textual `.eml`), emit
+browser JavaScript (`.js`), or emit C (`.c` / library `.c`+`.h`):
 
 ```powershell
 ./bin/eml compile -i filename.mxeml
@@ -145,9 +152,12 @@ emit browser JavaScript (`.js`):
 ./bin/eml compile -i stack.eml -of beml
 ./bin/eml --no-logo compile -i f.mxeml -of eml
 ./bin/eml compile -i f.mxeml -of js -o out.js
+./bin/eml compile -i f.mxeml -of c -o out.c
+./bin/eml compile -i f.mxeml -of clib -o out.c
 ```
 
-- `-of` / `--output-format` — `beml` (default), `eml`, or `js` (replaces old `-f` / `--format`)
+- `-of` / `--output-format` — `beml` (default), `eml`, `js`, `c`, or `clib`
+  (replaces old `-f` / `--format`)
 - Same-format compile is an error (`eml`→`eml`, `beml`→`beml`)
 - `--format` / `-f` is rejected; use `-of`
 - `-of js` writes a classic browser script that defines `eml(x, y)` with
@@ -156,6 +166,13 @@ emit browser JavaScript (`.js`):
   set, a companion `out.html` is written beside it (loads the pinned math.js
   CDN bundle and `out.js`, then shows `math.format(main())`). Without `-o`,
   only the JavaScript goes to stdout.
+- `-of c` writes a standalone C program using `<complex.h>` and
+  `long double complex` (`cexpl` / `clogl`), with `main` printing the result.
+- `-of clib` writes a C library `.c` defining `eml` and `compute`. When `-o`
+  is set, also writes a companion `.h` with those declarations. Without `-o`,
+  only the `.c` goes to stdout.
+- **Future (not implemented yet):** compile targets **`wasm`** and **`wat`**
+  (textual WebAssembly).
 
 ### Run
 
@@ -251,7 +268,8 @@ which captures stdout into a variable (not printed) and checks
 `|actual - expected| < 0.01`. Taylor `.mxeml` samples are skipped for `run`
 (and for IR chaining). For `parse`, each sample is emitted in all four formats.
 For `compile`, each sample writes default `.beml`, `-of eml` `.eml`, and (for
-non-taylor sources) `-of js` `.js` plus companion `.html`. Exit `1`
+non-taylor sources) `-of js` `.js` plus companion `.html`, plus `-of c` / `-of clib`
+(`.c`, and `.h` for clib). Exit `1`
 if any sample fails.
 
 ## Test

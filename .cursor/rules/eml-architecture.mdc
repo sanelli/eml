@@ -30,14 +30,14 @@ Tokenizers emit tokens. Parsers emit trees / IR. Do not skip the parse step. Bin
 ## Pipelines
 
 ```
-.mxeml → preprocessor → expr tokenizer → expr parser → (parse: AST dump | compile: Expr_Lower) → IR EML → .eml | .beml | .js (+ .html) | native | .NET | JVM | interpret
-.teml  → preprocessor → teml tokenizer → teml parser → IR EML → .eml | .beml | .js (+ .html) | native | .NET | JVM | interpret
-.eml   → eml tokenizer → eml parser → IR EML → .beml | .js (+ .html) | native | .NET | JVM | interpret
-.beml  → beml reader → Unflatten → IR EML → .eml | .js (+ .html) | native | .NET | JVM | interpret
+.mxeml → preprocessor → expr tokenizer → expr parser → (parse: AST dump | compile: Expr_Lower) → IR EML → .eml | .beml | .js (+ .html) | .c | clib (.c+.h) | native | .NET | JVM | interpret
+.teml  → preprocessor → teml tokenizer → teml parser → IR EML → .eml | .beml | .js (+ .html) | .c | clib (.c+.h) | native | .NET | JVM | interpret
+.eml   → eml tokenizer → eml parser → IR EML → .beml | .js (+ .html) | .c | clib (.c+.h) | native | .NET | JVM | interpret
+.beml  → beml reader → Unflatten → IR EML → .eml | .js (+ .html) | .c | clib (.c+.h) | native | .NET | JVM | interpret
 .mxeml | .teml → preproc → expanded same-format text
 .mxeml | .teml | .eml → tokenize → .tokens
 .mxeml | .teml | .eml | .beml → parse → .syntaxtree (mermaid/md/dot/svg)
-.mxeml | .teml | .eml | .beml → compile → .eml | .beml | .js   (same-format eml/beml rejected; js writes companion .html when -o)
+.mxeml | .teml | .eml | .beml → compile → .eml | .beml | .js | .c | clib   (same-format eml/beml rejected; js/clib write companions when -o)
 .mxeml | .teml | .eml | .beml → run → stdout compact Complex
 ```
 

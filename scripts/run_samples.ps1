@@ -13,7 +13,7 @@
 #   preproc  — .mxeml and .teml samples
 #   tokenize — .mxeml, .teml, and stack .eml (piped from compile)
 #   parse    — .mxeml, .teml, .eml, .beml (IR formats piped from compile)
-#   compile  — .mxeml, .teml → .beml/.eml/.js; then .eml↔.beml and IR→.js
+#   compile  — .mxeml, .teml → .beml/.eml/.js/.c/clib; then .eml↔.beml and IR→js/c/clib
 #   run      — .mxeml, .teml, chained .eml/.beml; stdout captured, not printed
 #
 # Results are written under .results/<operation>/ (except run, which has no
@@ -584,6 +584,60 @@ function Write-CompileFormatRow {
             return
         }
     }
+    elseif ($OutputFormat -eq "c") {
+        $FailDetail = $null
+        if (-not (Test-Path -LiteralPath $OutPath)) {
+            $FailDetail = "missing .c"
+        }
+        else {
+            $CText = Get-Content -LiteralPath $OutPath -Raw
+            if ($CText -notmatch "cexpl") {
+                $FailDetail = "c missing cexpl"
+            }
+            elseif ($CText -notmatch "int main") {
+                $FailDetail = "c missing main"
+            }
+        }
+        if ($null -ne $FailDetail) {
+            Write-ResultRow $Base $InputFormat $OutputFormat $CliOpts $false $FailDetail
+            $FailCount.Value++
+            return
+        }
+    }
+    elseif ($OutputFormat -eq "clib") {
+        $HPath = [System.IO.Path]::ChangeExtension($OutPath, ".h")
+        $FailDetail = $null
+        if (-not (Test-Path -LiteralPath $OutPath)) {
+            $FailDetail = "missing .c"
+        }
+        elseif (-not (Test-Path -LiteralPath $HPath)) {
+            $FailDetail = "missing .h"
+        }
+        else {
+            $CText = Get-Content -LiteralPath $OutPath -Raw
+            $HText = Get-Content -LiteralPath $HPath -Raw
+            if ($CText -notmatch "cexpl") {
+                $FailDetail = "clib missing cexpl"
+            }
+            elseif ($CText -notmatch "compute") {
+                $FailDetail = "clib missing compute"
+            }
+            elseif ($CText -match "int main") {
+                $FailDetail = "clib should not have main"
+            }
+            elseif ($HText -notmatch "eml\(") {
+                $FailDetail = "hdr missing eml"
+            }
+            elseif ($HText -notmatch "compute") {
+                $FailDetail = "hdr missing compute"
+            }
+        }
+        if ($null -ne $FailDetail) {
+            Write-ResultRow $Base $InputFormat $OutputFormat $CliOpts $false $FailDetail
+            $FailCount.Value++
+            return
+        }
+    }
 
     Write-ResultRow $Base $InputFormat $OutputFormat $CliOpts $true
     $OkCount.Value++
@@ -599,7 +653,7 @@ function Invoke-CompileSamples {
     Start-ResultTable `
         -Samples (Get-AllSampleNames) `
         -Inputs @("mxeml", "teml", "eml", "beml") `
-        -Outputs @("beml", "eml", "js") `
+        -Outputs @("beml", "eml", "js", "c", "clib") `
         -OptionsList @($CliOpts, "")
 
     foreach ($Sample in $script:MxemlSamples) {
@@ -611,6 +665,10 @@ function Invoke-CompileSamples {
         if ($Sample.Name -notmatch 'taylor') {
             Write-CompileFormatRow $Sample.FullName $Base "mxeml" "js" `
                 (Join-Path $ResultsDir ($Base + ".js")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+            Write-CompileFormatRow $Sample.FullName $Base "mxeml" "c" `
+                (Join-Path $ResultsDir ($Base + ".c")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+            Write-CompileFormatRow $Sample.FullName $Base "mxeml" "clib" `
+                (Join-Path $ResultsDir ($Base + ".clib.c")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
         }
     }
 
@@ -622,6 +680,10 @@ function Invoke-CompileSamples {
             (Join-Path $ResultsDir ($Base + ".eml")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
         Write-CompileFormatRow $Sample.FullName $Base "teml" "js" `
             (Join-Path $ResultsDir ($Base + ".js")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+        Write-CompileFormatRow $Sample.FullName $Base "teml" "c" `
+            (Join-Path $ResultsDir ($Base + ".c")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+        Write-CompileFormatRow $Sample.FullName $Base "teml" "clib" `
+            (Join-Path $ResultsDir ($Base + ".clib.c")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
     }
 
     $null = Ensure-ChainArtifacts
@@ -633,6 +695,10 @@ function Invoke-CompileSamples {
             (Join-Path $ResultsDir ($Base + ".from_eml.beml")) "" ([ref]$OkCount) ([ref]$FailCount)
         Write-CompileFormatRow $File.FullName $Base "eml" "js" `
             (Join-Path $ResultsDir ($Base + ".from_eml.js")) "" ([ref]$OkCount) ([ref]$FailCount)
+        Write-CompileFormatRow $File.FullName $Base "eml" "c" `
+            (Join-Path $ResultsDir ($Base + ".from_eml.c")) "" ([ref]$OkCount) ([ref]$FailCount)
+        Write-CompileFormatRow $File.FullName $Base "eml" "clib" `
+            (Join-Path $ResultsDir ($Base + ".from_eml.clib.c")) "" ([ref]$OkCount) ([ref]$FailCount)
     }
 
     $BemlFiles = @(Get-ChildItem -LiteralPath $script:ChainDir -Filter "*.beml" | Sort-Object Name)
@@ -642,6 +708,10 @@ function Invoke-CompileSamples {
             (Join-Path $ResultsDir ($Base + ".from_beml.eml")) "" ([ref]$OkCount) ([ref]$FailCount)
         Write-CompileFormatRow $File.FullName $Base "beml" "js" `
             (Join-Path $ResultsDir ($Base + ".from_beml.js")) "" ([ref]$OkCount) ([ref]$FailCount)
+        Write-CompileFormatRow $File.FullName $Base "beml" "c" `
+            (Join-Path $ResultsDir ($Base + ".from_beml.c")) "" ([ref]$OkCount) ([ref]$FailCount)
+        Write-CompileFormatRow $File.FullName $Base "beml" "clib" `
+            (Join-Path $ResultsDir ($Base + ".from_beml.clib.c")) "" ([ref]$OkCount) ([ref]$FailCount)
     }
 
     $Total = $OkCount + $FailCount
