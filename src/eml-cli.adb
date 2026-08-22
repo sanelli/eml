@@ -15,6 +15,7 @@ with Expr_Parser;
 with Expr_Tokenizer;
 with Interpreter;
 with IR_Eml;
+with Js_Backend;
 
 use type Interpreter.Eval_Status;
 with Teml_Parser;
@@ -30,13 +31,14 @@ package body Eml.CLI is
    use type Expr_Tokenizer.Diagnostic_Array_Access;
    use type Expr_Tokenizer.Origin_Map_Access;
    use type Eml_Tokenizer.Diagnostic_Array_Access;
-   use type IR_Eml.Output_Format;
    use type IR_Eml.Tree_Output_Format;
    use type Teml_Tokenizer.Diagnostic_Array_Access;
 
    type Warn_Mode is (Default_Warn, No_Warn, Error_Warn);
 
    type Input_Format is (Mxeml, Teml, Stack_Eml, Beml);
+
+   type Compile_Output_Format is (Eml_Text, Beml_Binary, Javascript);
 
    type Binding_List is array (Positive range <>) of Expr_Preprocessor.Binding;
 
@@ -116,7 +118,7 @@ package body Eml.CLI is
       Emit_Error_Line
         ("  eml compile "
          & Common_Options
-         & " [--output-format|-of eml|beml]",
+         & " [--output-format|-of eml|beml|js]",
          Use_Color);
       Emit_Error_Line
         ("  eml run "
@@ -152,7 +154,7 @@ package body Eml.CLI is
       Put_Stdout ("  tokenize   Dump the token stream of a source file");
       Put_Stdout ("  parse      Dump the syntax tree of a source file");
       Put_Stdout
-        ("  compile    Lower a source file to EML IR (.beml or .eml)");
+        ("  compile    Lower to .beml, .eml, or .js (+ companion .html)");
       Put_Stdout
         ("  run        Evaluate IR EML and print a complex result");
       Put_Stdout ("");
@@ -316,7 +318,7 @@ package body Eml.CLI is
       Put_Stdout
         ("  eml compile "
          & Common_Options
-         & " [--output-format|-of eml|beml]");
+         & " [--output-format|-of eml|beml|js]");
       Put_Stdout ("");
       Put_Stdout ("Options:");
       Put_Stdout
@@ -326,7 +328,7 @@ package body Eml.CLI is
       Put_Stdout
         ("  --output, -o <file>         Optional output; stdout if omitted");
       Put_Stdout
-        ("  --output-format, -of FMT    beml (default) or eml");
+        ("  --output-format, -of FMT    beml (default), eml, or js");
       Put_Stdout
         ("  --var, -v $NAME=EXPR        Preprocessor binding "
          & "(mxeml/teml only)");
@@ -334,15 +336,24 @@ package body Eml.CLI is
       Put_Stdout ("Output extensions must match --output-format:");
       Put_Stdout ("  beml -> .beml");
       Put_Stdout ("  eml  -> .eml");
+      Put_Stdout ("  js   -> .js (writes companion .html beside -o)");
       Put_Stdout ("");
       Put_Stdout
         ("Compiling eml to eml or beml to beml is rejected "
          & "(use conversion instead).");
+      Put_Stdout
+        ("-of js emits browser JavaScript (math.js) and, "
+         & "when -o is set, a companion .html that loads "
+         & "the script and shows main().");
+      Put_Stdout
+        ("Without -o, only the JavaScript goes to stdout "
+         & "(no HTML).");
       Put_Stdout ("");
       Put_Stdout ("Examples:");
       Put_Stdout ("  eml compile -i filename.mxeml -o other.beml");
       Put_Stdout ("  eml compile -i f.eml -of beml -o out.beml");
       Put_Stdout ("  eml --no-logo compile -if mxeml < in.mxeml -of eml");
+      Put_Stdout ("  eml compile -i f.mxeml -of js -o out.js");
    end Put_Compile_Help;
 
    procedure Put_Run_Help is
@@ -681,33 +692,37 @@ package body Eml.CLI is
    end To_IR_Tree_Format;
 
    function Parse_Compile_Output_Format
-     (S : String; Ok : out Boolean) return IR_Eml.Output_Format
+     (S : String; Ok : out Boolean) return Compile_Output_Format
    is
    begin
       Ok := True;
       if S = "eml" then
-         return IR_Eml.Eml_Text;
+         return Eml_Text;
       elsif S = "beml" then
-         return IR_Eml.Beml_Binary;
+         return Beml_Binary;
+      elsif S = "js" then
+         return Javascript;
       else
          Ok := False;
-         return IR_Eml.Beml_Binary;
+         return Beml_Binary;
       end if;
    end Parse_Compile_Output_Format;
 
-   function Compile_Extension (Fmt : IR_Eml.Output_Format) return String is
+   function Compile_Extension (Fmt : Compile_Output_Format) return String is
    begin
       case Fmt is
-         when IR_Eml.Eml_Text    => return ".eml";
-         when IR_Eml.Beml_Binary => return ".beml";
+         when Eml_Text    => return ".eml";
+         when Beml_Binary => return ".beml";
+         when Javascript  => return ".js";
       end case;
    end Compile_Extension;
 
-   function Compile_Format_Image (Fmt : IR_Eml.Output_Format) return String is
+   function Compile_Format_Image (Fmt : Compile_Output_Format) return String is
    begin
       case Fmt is
-         when IR_Eml.Eml_Text    => return "eml";
-         when IR_Eml.Beml_Binary => return "beml";
+         when Eml_Text    => return "eml";
+         when Beml_Binary => return "beml";
+         when Javascript  => return "js";
       end case;
    end Compile_Format_Image;
 
@@ -1236,21 +1251,28 @@ package body Eml.CLI is
       Meta        : IR_Eml.Dump_Meta;
       Output_Path : String;
       Has_Output  : Boolean;
-      Fmt         : IR_Eml.Output_Format)
+      Fmt         : Compile_Output_Format)
    is
    begin
       case Fmt is
-         when IR_Eml.Eml_Text =>
+         when Eml_Text =>
             if Has_Output then
                IR_Eml.Write_Eml_To_File (IR, Meta, Output_Path);
             else
                IR_Eml.Write_Eml_To_Stdout (IR, Meta);
             end if;
-         when IR_Eml.Beml_Binary =>
+         when Beml_Binary =>
             if Has_Output then
                IR_Eml.Write_Beml_To_File (IR, Meta, Output_Path);
             else
                IR_Eml.Write_Beml_To_Stdout (IR, Meta);
+            end if;
+         when Javascript =>
+            if Has_Output then
+               Js_Backend.Write_Js_To_File (IR, Meta, Output_Path);
+               Js_Backend.Write_Html_To_File (Output_Path);
+            else
+               Js_Backend.Write_Js_To_Stdout (IR, Meta);
             end if;
       end case;
    end Write_Compile_Output;
@@ -1398,7 +1420,7 @@ package body Eml.CLI is
       Bin_Data     : Ada.Streams.Stream_Element_Array;
       Output_Path  : String;
       Has_Output   : Boolean;
-      Fmt          : IR_Eml.Output_Format;
+      Fmt          : Compile_Output_Format;
       Bindings     : Binding_Array;
       Warn         : Warn_Mode;
       Use_Color    : Boolean) return Ada.Command_Line.Exit_Status
@@ -1499,7 +1521,7 @@ package body Eml.CLI is
       Use_Color          : Boolean;
       Cmd                : Unbounded_String;
       Tree_Fmt           : Expr_Parser.Output_Format := Expr_Parser.Mermaid;
-      Compile_Fmt        : IR_Eml.Output_Format := IR_Eml.Beml_Binary;
+      Compile_Fmt        : Compile_Output_Format := Beml_Binary;
       Preproc_Out_Fmt    : Input_Format := Mxeml;
       Format_Ok          : Boolean;
       Compile_Ok         : Boolean;
@@ -2161,8 +2183,8 @@ package body Eml.CLI is
             end if;
          end if;
 
-         if (In_Fmt = Stack_Eml and then Compile_Fmt = IR_Eml.Eml_Text)
-           or else (In_Fmt = Beml and then Compile_Fmt = IR_Eml.Beml_Binary)
+         if (In_Fmt = Stack_Eml and then Compile_Fmt = Eml_Text)
+           or else (In_Fmt = Beml and then Compile_Fmt = Beml_Binary)
          then
             Fail_CLI
               (CLI_Same_Format_Compile,

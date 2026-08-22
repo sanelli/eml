@@ -1425,6 +1425,284 @@ package body CLI_Tests is
          Require
            (Status = Ada.Command_Line.Failure, "cli-run-badext: exit");
       end;
+
+      declare
+         In_Path  : constant String :=
+           Write_Temp ("cli_compile_js.mxeml", "e");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_js.js");
+         Html_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_js.html");
+         Args     : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("js"),
+            A ("-o"),
+            A (Out_Path)];
+         Status   : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+         Js_Text  : constant String := Read_All (Out_Path);
+         Html_Text : constant String := Read_All (Html_Path);
+      begin
+         Require
+           (Status = Ada.Command_Line.Success, "cli-compile-js: exit");
+         Require
+           (Ada.Strings.Fixed.Index (Js_Text, "function eml") > 0,
+            "cli-compile-js: eml fn");
+         Require
+           (Ada.Strings.Fixed.Index (Js_Text, "function main") > 0,
+            "cli-compile-js: main fn");
+         Require
+           (Ada.Strings.Fixed.Index (Js_Text, "eml(") > 0,
+            "cli-compile-js: nested eml");
+         Require
+           (Ada.Strings.Fixed.Index (Html_Text, "mathjs") > 0,
+            "cli-compile-js: html cdn");
+         Require
+           (Ada.Strings.Fixed.Index
+              (Html_Text, "cli_compile_js.js")
+            > 0,
+            "cli-compile-js: html src");
+         Require
+           (Ada.Strings.Fixed.Index (Html_Text, "main()") > 0,
+            "cli-compile-js: html main");
+      end;
+
+      declare
+         In_Path  : constant String :=
+           Write_Temp ("cli_compile_js_teml.teml", "eml(1, 1)");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_js_teml.js");
+         Args     : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("js"),
+            A ("-o"),
+            A (Out_Path)];
+         Status   : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Success,
+            "cli-compile-js-teml: exit");
+         Require
+           (Ada.Directories.Exists
+              (Ada.Directories.Compose
+                 (Temp_Dir, "cli_compile_js_teml.html")),
+            "cli-compile-js-teml: html");
+      end;
+
+      declare
+         In_Path  : constant String :=
+           Write_Temp
+             ("cli_compile_js_eml.eml",
+              "ONE" & ASCII.LF & "ONE" & ASCII.LF & "EML");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_js_eml.js");
+         Args     : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("js"),
+            A ("-o"),
+            A (Out_Path)];
+         Status   : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Success,
+            "cli-compile-js-eml: exit");
+      end;
+
+      declare
+         Mx_Path  : constant String :=
+           Write_Temp ("cli_compile_js_beml.mxeml", "e");
+         Beml_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_js_beml.beml");
+         Out_Path : constant String :=
+           Ada.Directories.Compose
+             (Temp_Dir, "cli_compile_js_from_beml.js");
+         Status1  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run
+             ([A ("--no-logo"),
+               A ("compile"),
+               A ("-i"),
+               A (Mx_Path),
+               A ("-o"),
+               A (Beml_Path)]);
+         Status2  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run
+             ([A ("--no-logo"),
+               A ("compile"),
+               A ("-i"),
+               A (Beml_Path),
+               A ("-of"),
+               A ("js"),
+               A ("-o"),
+               A (Out_Path)]);
+      begin
+         Require
+           (Status1 = Ada.Command_Line.Success,
+            "cli-compile-js-beml: beml exit");
+         Require
+           (Status2 = Ada.Command_Line.Success,
+            "cli-compile-js-beml: js exit");
+      end;
+
+      declare
+         In_Path  : constant String :=
+           Write_Temp ("cli_compile_js_var.mxeml", "$X");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_js_var.js");
+         Args     : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-v"),
+            A ("$X=1"),
+            A ("-of"),
+            A ("js"),
+            A ("-o"),
+            A (Out_Path)];
+         Status   : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Success,
+            "cli-compile-js-var: exit");
+      end;
+
+      declare
+         Args   : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-if"),
+            A ("mxeml"),
+            A ("-of"),
+            A ("js")];
+         Status : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args, "e");
+      begin
+         Require
+           (Status = Ada.Command_Line.Success,
+            "cli-compile-js-stdout: exit");
+      end;
+
+      declare
+         In_Path  : constant String :=
+           Write_Temp ("cli_compile_js_badext.mxeml", "1");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_js_badext.eml");
+         Args     : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("js"),
+            A ("-o"),
+            A (Out_Path)];
+         Status   : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure,
+            "cli-compile-js-badext: exit");
+      end;
+
+      declare
+         In_Path  : constant String :=
+           Write_Temp ("cli_compile_js_lex.mxeml", "1+@2");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_js_lex.js");
+         Html_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_js_lex.html");
+         Args     : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("js"),
+            A ("-o"),
+            A (Out_Path)];
+         Status   : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure,
+            "cli-compile-js-lex: exit");
+         Require
+           (not Ada.Directories.Exists (Out_Path),
+            "cli-compile-js-lex: no js");
+         Require
+           (not Ada.Directories.Exists (Html_Path),
+            "cli-compile-js-lex: no html");
+      end;
+
+      declare
+         In_Path  : constant String :=
+           Write_Temp ("cli_compile_js_unbound.mxeml", "$X");
+         Out_Path : constant String :=
+           Ada.Directories.Compose
+             (Temp_Dir, "cli_compile_js_unbound.js");
+         Html_Path : constant String :=
+           Ada.Directories.Compose
+             (Temp_Dir, "cli_compile_js_unbound.html");
+         Args     : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("js"),
+            A ("-o"),
+            A (Out_Path)];
+         Status   : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure,
+            "cli-compile-js-unbound: exit");
+         Require
+           (not Ada.Directories.Exists (Out_Path),
+            "cli-compile-js-unbound: no js");
+         Require
+           (not Ada.Directories.Exists (Html_Path),
+            "cli-compile-js-unbound: no html");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_compile_js_badfmt.mxeml", "1");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("javascript")];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure,
+            "cli-compile-js-javascript: exit");
+      end;
    end Run;
 
 end CLI_Tests;

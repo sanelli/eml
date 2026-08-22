@@ -1,5 +1,5 @@
 ---
-description: Compilation targets from IR EML (EML text, LLVM, .NET, Java bytecode)
+description: Compilation targets from IR EML (EML text, JS, LLVM, .NET, Java bytecode)
 alwaysApply: true
 ---
 
@@ -11,15 +11,16 @@ All backends consume **IR EML** (never the source AST directly).
 |---|---|
 | **Stack `.eml`** | Post-order `ONE` / `EML` textual dump with UTC header (`eml compile -of eml`) |
 | **Stack `.beml`** | Packed-bit binary of the same stream (`eml compile -of beml`, default) |
+| **JavaScript `.js`** | Nested `eml(...)` browser script + companion `.html` (`eml compile -of js`); uses math.js CDN for complex `exp`/`log` |
 | **EML tree text** | Nested `eml(...)` and `1` (`.teml` input / IR tree dumps; not a compile `-of` yet) |
 | **Native binary** | Lower IR EML through **LLVM** to a machine-code executable |
 | **.NET CLI** | Emit a **.NET CLI DLL/executable**; **may use** .NET math |
 | **Java bytecode** | Emit a **Java class**; **may use** Java math |
 | **Interpreter** | Evaluate IR EML in-process (same executable) |
 
-Native LLVM lowering should realize `eml(x, y) = exp(x) - ln(y)` (complex). .NET and Java backends may call the host language’s `exp` / `log` (and other math) instead of expanding everything to a single opcode.
+Native LLVM lowering should realize `eml(x, y) = exp(x) - ln(y)` (complex). .NET and Java backends may call the host language’s `exp` / `log` (and other math) instead of expanding everything to a single opcode. The JS backend defines `eml` with math.js (`math.exp` / `math.log`) and nests calls from the IR tree (no Flatten).
 
-`eml compile --output-format` / `-of` currently supports `eml` (textual stack IR) and `beml` (binary stack IR). `--format` / `-f` is removed. Future `-of` values: `cli` → .NET DLL, `bytecode` → Java, `binary` → LLVM native. Same-format compile (`eml`→`eml`, `beml`→`beml`) is rejected. See `eml-cli`.
+`eml compile --output-format` / `-of` currently supports `eml` (textual stack IR), `beml` (binary stack IR), and `js` (browser JavaScript + companion HTML when `-o` is set). `--format` / `-f` is removed. Future `-of` values: `cli` → .NET DLL, `bytecode` → Java, `binary` → LLVM native. Same-format compile (`eml`→`eml`, `beml`→`beml`) is rejected. See `eml-cli`.
 
 ## Not yet specified
 

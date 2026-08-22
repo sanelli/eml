@@ -13,7 +13,7 @@
 #   preproc  — .mxeml and .teml samples
 #   tokenize — .mxeml, .teml, and stack .eml (piped from compile)
 #   parse    — .mxeml, .teml, .eml, .beml (IR formats piped from compile)
-#   compile  — .mxeml, .teml → .beml/.eml; then .eml↔.beml conversion
+#   compile  — .mxeml, .teml → .beml/.eml/.js; then .eml↔.beml and IR→.js
 #   run      — .mxeml, .teml, chained .eml/.beml; stdout captured, not printed
 #
 # Results are written under .results/<operation>/ (except run, which has no
@@ -549,11 +549,44 @@ function Write-CompileFormatRow {
     if ($LASTEXITCODE -ne 0) {
         Write-ResultRow $Base $InputFormat $OutputFormat $CliOpts $false "exit $LASTEXITCODE"
         $FailCount.Value++
+        return
     }
-    else {
-        Write-ResultRow $Base $InputFormat $OutputFormat $CliOpts $true
-        $OkCount.Value++
+
+    if ($OutputFormat -eq "js") {
+        $HtmlPath = [System.IO.Path]::ChangeExtension($OutPath, ".html")
+        $JsName = [System.IO.Path]::GetFileName($OutPath)
+        $FailDetail = $null
+        if (-not (Test-Path -LiteralPath $OutPath)) {
+            $FailDetail = "missing .js"
+        }
+        elseif (-not (Test-Path -LiteralPath $HtmlPath)) {
+            $FailDetail = "missing .html"
+        }
+        else {
+            $JsText = Get-Content -LiteralPath $OutPath -Raw
+            $HtmlText = Get-Content -LiteralPath $HtmlPath -Raw
+            if ($JsText -notmatch "function eml") {
+                $FailDetail = "js missing function eml"
+            }
+            elseif ($JsText -notmatch "function main") {
+                $FailDetail = "js missing function main"
+            }
+            elseif ($HtmlText -notmatch "mathjs") {
+                $FailDetail = "html missing mathjs"
+            }
+            elseif ($HtmlText -notlike "*$JsName*") {
+                $FailDetail = "html missing $JsName"
+            }
+        }
+        if ($null -ne $FailDetail) {
+            Write-ResultRow $Base $InputFormat $OutputFormat $CliOpts $false $FailDetail
+            $FailCount.Value++
+            return
+        }
     }
+
+    Write-ResultRow $Base $InputFormat $OutputFormat $CliOpts $true
+    $OkCount.Value++
 }
 
 function Invoke-CompileSamples {
@@ -566,7 +599,7 @@ function Invoke-CompileSamples {
     Start-ResultTable `
         -Samples (Get-AllSampleNames) `
         -Inputs @("mxeml", "teml", "eml", "beml") `
-        -Outputs @("beml", "eml") `
+        -Outputs @("beml", "eml", "js") `
         -OptionsList @($CliOpts, "")
 
     foreach ($Sample in $script:MxemlSamples) {
@@ -575,6 +608,10 @@ function Invoke-CompileSamples {
             (Join-Path $ResultsDir ($Base + ".beml")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
         Write-CompileFormatRow $Sample.FullName $Base "mxeml" "eml" `
             (Join-Path $ResultsDir ($Base + ".eml")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+        if ($Sample.Name -notmatch 'taylor') {
+            Write-CompileFormatRow $Sample.FullName $Base "mxeml" "js" `
+                (Join-Path $ResultsDir ($Base + ".js")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+        }
     }
 
     foreach ($Sample in $script:TemlSamples) {
@@ -583,6 +620,8 @@ function Invoke-CompileSamples {
             (Join-Path $ResultsDir ($Base + ".beml")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
         Write-CompileFormatRow $Sample.FullName $Base "teml" "eml" `
             (Join-Path $ResultsDir ($Base + ".eml")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+        Write-CompileFormatRow $Sample.FullName $Base "teml" "js" `
+            (Join-Path $ResultsDir ($Base + ".js")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
     }
 
     $null = Ensure-ChainArtifacts
@@ -592,6 +631,8 @@ function Invoke-CompileSamples {
         $Base = Get-SampleBaseName $File
         Write-CompileFormatRow $File.FullName $Base "eml" "beml" `
             (Join-Path $ResultsDir ($Base + ".from_eml.beml")) "" ([ref]$OkCount) ([ref]$FailCount)
+        Write-CompileFormatRow $File.FullName $Base "eml" "js" `
+            (Join-Path $ResultsDir ($Base + ".from_eml.js")) "" ([ref]$OkCount) ([ref]$FailCount)
     }
 
     $BemlFiles = @(Get-ChildItem -LiteralPath $script:ChainDir -Filter "*.beml" | Sort-Object Name)
@@ -599,6 +640,8 @@ function Invoke-CompileSamples {
         $Base = Get-SampleBaseName $File
         Write-CompileFormatRow $File.FullName $Base "beml" "eml" `
             (Join-Path $ResultsDir ($Base + ".from_beml.eml")) "" ([ref]$OkCount) ([ref]$FailCount)
+        Write-CompileFormatRow $File.FullName $Base "beml" "js" `
+            (Join-Path $ResultsDir ($Base + ".from_beml.js")) "" ([ref]$OkCount) ([ref]$FailCount)
     }
 
     $Total = $OkCount + $FailCount

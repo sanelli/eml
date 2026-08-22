@@ -64,13 +64,18 @@ flowchart TD
   irNode --> flatten[IR_Eml.Flatten]
   flatten --> writeBeml["compile -of beml"]
   writeBeml --> bemlFile[.beml]
+  irNode --> writeJs["compile -of js"]
+  writeJs --> jsFile[.js]
+  jsFile --> htmlFile[".html companion when -o"]
   flatten --> stack[Complex stack]
   stack --> stdout["eml run: stdout compact Complex"]
 ```
 
 `preproc`, `tokenize`, and `parse` stop at their dump (expanded text, tokens,
 or tree). `compile` and `run` continue from `IR_Eml.Node`; `run` Flattens to
-opcodes and evaluates on a complex stack (no output file).
+opcodes and evaluates on a complex stack (no output file). `-of js` walks the
+IR tree into nested `eml(...)` calls (no Flatten) and, with `-o`, writes a
+companion `.html` that loads math.js and the generated script.
 
 ## Run
 
@@ -129,7 +134,8 @@ Accepts all four input formats. `-of` / `--output-format`: `mermaid` (default),
 
 ### Compile
 
-Lower to stack-machine IR (`.beml` binary by default, or textual `.eml`):
+Lower to stack-machine IR (`.beml` binary by default, or textual `.eml`), or
+emit browser JavaScript (`.js`):
 
 ```powershell
 ./bin/eml compile -i filename.mxeml
@@ -138,11 +144,18 @@ Lower to stack-machine IR (`.beml` binary by default, or textual `.eml`):
 ./bin/eml compile -i f.teml -of beml
 ./bin/eml compile -i stack.eml -of beml
 ./bin/eml --no-logo compile -i f.mxeml -of eml
+./bin/eml compile -i f.mxeml -of js -o out.js
 ```
 
-- `-of` / `--output-format` — `beml` (default) or `eml` (replaces old `-f` / `--format`)
+- `-of` / `--output-format` — `beml` (default), `eml`, or `js` (replaces old `-f` / `--format`)
 - Same-format compile is an error (`eml`→`eml`, `beml`→`beml`)
 - `--format` / `-f` is rejected; use `-of`
+- `-of js` writes a classic browser script that defines `eml(x, y)` with
+  [math.js](https://mathjs.org/) (`math.exp` / `math.log`) and a `main()` that
+  returns nested `eml(...)` calls matching the IR tree. When `-o out.js` is
+  set, a companion `out.html` is written beside it (loads the pinned math.js
+  CDN bundle and `out.js`, then shows `math.format(main())`). Without `-o`,
+  only the JavaScript goes to stdout.
 
 ### Run
 
@@ -237,7 +250,8 @@ The script passes dummy `--var` bindings for sample variable names and
 which captures stdout into a variable (not printed) and checks
 `|actual - expected| < 0.01`. Taylor `.mxeml` samples are skipped for `run`
 (and for IR chaining). For `parse`, each sample is emitted in all four formats.
-For `compile`, each sample writes default `.beml` and `-of eml` `.eml`. Exit `1`
+For `compile`, each sample writes default `.beml`, `-of eml` `.eml`, and (for
+non-taylor sources) `-of js` `.js` plus companion `.html`. Exit `1`
 if any sample fails.
 
 ## Test
