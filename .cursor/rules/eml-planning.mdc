@@ -31,12 +31,16 @@ Before working the plan, check the current git branch.
 - If it is not, **ask permission** to create that branch from `main`. Do not create it silently. Do not implement the plan on `main` unless the user says so.
 - After the user grants permission, **create** the feature branch from `main` before implementing any step. Prefer `feature/<plan-slug>` (or the name the user chose).
 
-## Plans are versioned
+## Plans are versioned — commit always, delete never
 
 - Feature plans live under [`.cursor/plans/`](.cursor/plans/) (e.g. `*.plan.md`).
 - **Always commit plans** to git with the feature work (or as soon as the plan is accepted). Do not leave new or updated plans untracked. A feature commit that omits its plan is incomplete.
 - Keep the plan file in the repo after the feature lands on `main` so history stays auditable.
-- **Never delete** plan files under `.cursor/plans/`. Do not remove them in cleanup, branch switches, merges, or “tidy up” passes. Plans are permanent project history.
+- **NEVER delete, overwrite-away, or `Remove-Item` / `rm` a plan** under `.cursor/plans/`. This is a hard rule for agents:
+  - Not during cleanup, branch switches, rebases, merges, stashes, “tidy up”, or to unblock git.
+  - Not because a plan is untracked, duplicated, leftover after a failed checkout, or about to be brought in by a merge.
+  - If git refuses a merge/checkout because an untracked plan would be overwritten: **`git add` the plan** (then merge/commit), or move it aside only by **`git stash push -u -- <that-plan>`** and restore it — never delete it.
+  - Plans are permanent project history. Prefer failing and asking the user over removing a plan file.
 
 ## After the plan
 
