@@ -75,14 +75,69 @@ function Get-SampleBaseName {
     return [System.IO.Path]::GetFileNameWithoutExtension($Sample.Name)
 }
 
-function New-TableRows {
-    # Unary comma keeps the empty List from being unwrapped to $null.
-    return ,([System.Collections.Generic.List[hashtable]]::new())
+function Pad-Cell {
+    param([string] $Text, [int] $Width)
+    if ($null -eq $Text) {
+        $Text = ""
+    }
+    if ($Text.Length -ge $Width) {
+        return $Text
+    }
+    return $Text + (" " * ($Width - $Text.Length))
 }
 
-function Add-TableRow {
+function Start-ResultTable {
     param(
-        [System.Collections.Generic.List[hashtable]] $Rows,
+        [string[]] $Samples = @(),
+        [string[]] $Inputs = @(),
+        [string[]] $Outputs = @(),
+        [string[]] $OptionsList = @()
+    )
+
+    $HSample = "sample name"
+    $HInput = "input format"
+    $HOutput = "output format"
+    $HOptions = "CLI options"
+    $HResult = "result"
+
+    $WSample = $HSample.Length
+    $WInput = $HInput.Length
+    $WOutput = $HOutput.Length
+    $WOptions = $HOptions.Length
+    $WResult = [Math]::Max($HResult.Length, "[FAIL]".Length)
+
+    foreach ($S in $Samples) {
+        if ($S.Length -gt $WSample) { $WSample = $S.Length }
+    }
+    foreach ($V in $Inputs) {
+        if ($V.Length -gt $WInput) { $WInput = $V.Length }
+    }
+    foreach ($V in $Outputs) {
+        if ($V.Length -gt $WOutput) { $WOutput = $V.Length }
+    }
+    foreach ($V in $OptionsList) {
+        if ($null -ne $V -and $V.Length -gt $WOptions) { $WOptions = $V.Length }
+    }
+
+    $script:TableWidths = @{
+        Sample  = $WSample
+        Input   = $WInput
+        Output  = $WOutput
+        Options = $WOptions
+        Result  = $WResult
+    }
+
+    Write-Host ""
+    $Header =
+        "| $(Pad-Cell $HSample $WSample) | $(Pad-Cell $HInput $WInput) | $(Pad-Cell $HOutput $WOutput) | $(Pad-Cell $HOptions $WOptions) | $(Pad-Cell $HResult $WResult) |"
+    $Rule =
+        "|-$("-" * $WSample)-|-$("-" * $WInput)-|-$("-" * $WOutput)-|-$("-" * $WOptions)-|-$("-" * $WResult)-|"
+    Write-Color $Header DarkGray
+    Write-Color $Rule DarkGray
+}
+
+function Write-ResultRow {
+    param(
         [string] $Sample,
         [string] $InputFormat,
         [string] $OutputFormat,
@@ -90,75 +145,43 @@ function Add-TableRow {
         [bool] $Ok,
         [string] $FailDetail = ""
     )
-    $Rows.Add(@{
-        Sample = $Sample
-        Input  = $InputFormat
-        Output = $OutputFormat
-        Options = $Options
-        Ok = $Ok
-        FailDetail = $FailDetail
-    }) | Out-Null
-}
 
-function Write-ResultTable {
-    param([System.Collections.Generic.List[hashtable]] $Rows)
-
-    if ($Rows.Count -eq 0) {
-        return
+    $W = $script:TableWidths
+    $Status = if ($Ok) { "[OK]" } else { "[FAIL]" }
+    $Prefix =
+        "| $(Pad-Cell $Sample $W.Sample) | $(Pad-Cell $InputFormat $W.Input) | $(Pad-Cell $OutputFormat $W.Output) | $(Pad-Cell $Options $W.Options) | "
+    Write-Color $Prefix White -NoNewline
+    if ($Ok) {
+        Write-Color (Pad-Cell $Status $W.Result) Green -NoNewline
+        Write-Color " |" White
     }
-
-    $HSample = "sample name"
-    $HInput = "input format"
-    $HOutput = "output format"
-    $HOptions = "CLI options"
-    $HStatus = "result"
-
-    $WSample = $HSample.Length
-    $WInput = $HInput.Length
-    $WOutput = $HOutput.Length
-    $WOptions = $HOptions.Length
-    $WStatus = [Math]::Max($HStatus.Length, "[FAIL]".Length)
-
-    foreach ($R in $Rows) {
-        if ($R.Sample.Length -gt $WSample) { $WSample = $R.Sample.Length }
-        if ($R.Input.Length -gt $WInput) { $WInput = $R.Input.Length }
-        if ($R.Output.Length -gt $WOutput) { $WOutput = $R.Output.Length }
-        if ($R.Options.Length -gt $WOptions) { $WOptions = $R.Options.Length }
-    }
-
-    function Pad([string] $Text, [int] $Width) {
-        if ($Text.Length -ge $Width) { return $Text }
-        return $Text + (" " * ($Width - $Text.Length))
-    }
-
-    Write-Host ""
-    $Header =
-        "| $(Pad $HSample $WSample) | $(Pad $HInput $WInput) | $(Pad $HOutput $WOutput) | $(Pad $HOptions $WOptions) | $(Pad $HStatus $WStatus) |"
-    $Rule =
-        "|-$("-" * $WSample)-|-$("-" * $WInput)-|-$("-" * $WOutput)-|-$("-" * $WOptions)-|-$("-" * $WStatus)-|"
-    Write-Color $Header DarkGray
-    Write-Color $Rule DarkGray
-
-    foreach ($R in $Rows) {
-        $Status = if ($R.Ok) { "[OK]" } else { "[FAIL]" }
-        $Prefix =
-            "| $(Pad $R.Sample $WSample) | $(Pad $R.Input $WInput) | $(Pad $R.Output $WOutput) | $(Pad $R.Options $WOptions) | "
-        Write-Color $Prefix White -NoNewline
-        if ($R.Ok) {
-            Write-Color (Pad $Status $WStatus) Green -NoNewline
-            Write-Color " |" White
+    else {
+        Write-Color (Pad-Cell $Status $W.Result) Red -NoNewline
+        Write-Color " |" White -NoNewline
+        if ($FailDetail.Length -gt 0) {
+            Write-Color "  $FailDetail" DarkRed
         }
         else {
-            Write-Color (Pad $Status $WStatus) Red -NoNewline
-            Write-Color " |" White -NoNewline
-            if ($R.FailDetail.Length -gt 0) {
-                Write-Color "  $($R.FailDetail)" DarkRed
-            }
-            else {
-                Write-Host ""
-            }
+            Write-Host ""
         }
     }
+}
+
+function Get-AllSampleNames {
+    $Names = [System.Collections.Generic.List[string]]::new()
+    foreach ($S in $script:MxemlSamples) {
+        [void]$Names.Add((Get-SampleBaseName $S))
+    }
+    foreach ($S in $script:TemlSamples) {
+        [void]$Names.Add((Get-SampleBaseName $S))
+    }
+    foreach ($S in $script:ChainSources) {
+        $N = Get-SampleBaseName $S
+        if (-not $Names.Contains($N)) {
+            [void]$Names.Add($N)
+        }
+    }
+    return ,$Names.ToArray()
 }
 
 function Write-OpSummary {
@@ -310,10 +333,15 @@ function Ensure-ChainArtifacts {
 function Invoke-PreprocSamples {
     $OkCount = 0
     $FailCount = 0
-    $Rows = New-TableRows
     $ResultsDir = Join-Path $Root ".results" "preproc"
     New-Item -ItemType Directory -Force -Path $ResultsDir | Out-Null
     $CliOpts = "-v … -w none"
+
+    Start-ResultTable `
+        -Samples (Get-AllSampleNames) `
+        -Inputs @("mxeml", "teml") `
+        -Outputs @("mxeml", "teml") `
+        -OptionsList @($CliOpts)
 
     foreach ($Sample in $script:MxemlSamples) {
         $Base = Get-SampleBaseName $Sample
@@ -321,11 +349,11 @@ function Invoke-PreprocSamples {
         & $script:Eml --no-logo --no-color preproc `
             -i $Sample.FullName @SampleVarArgs -o $OutPath
         if ($LASTEXITCODE -ne 0) {
-            Add-TableRow $Rows $Base "mxeml" "mxeml" $CliOpts $false "exit $LASTEXITCODE"
+            Write-ResultRow $Base "mxeml" "mxeml" $CliOpts $false "exit $LASTEXITCODE"
             $FailCount++
         }
         else {
-            Add-TableRow $Rows $Base "mxeml" "mxeml" $CliOpts $true
+            Write-ResultRow $Base "mxeml" "mxeml" $CliOpts $true
             $OkCount++
         }
     }
@@ -336,16 +364,15 @@ function Invoke-PreprocSamples {
         & $script:Eml --no-logo --no-color preproc `
             -i $Sample.FullName @SampleVarArgs -o $OutPath
         if ($LASTEXITCODE -ne 0) {
-            Add-TableRow $Rows $Base "teml" "teml" $CliOpts $false "exit $LASTEXITCODE"
+            Write-ResultRow $Base "teml" "teml" $CliOpts $false "exit $LASTEXITCODE"
             $FailCount++
         }
         else {
-            Add-TableRow $Rows $Base "teml" "teml" $CliOpts $true
+            Write-ResultRow $Base "teml" "teml" $CliOpts $true
             $OkCount++
         }
     }
 
-    Write-ResultTable $Rows
     $Total = $OkCount + $FailCount
     Write-OpSummary -Op "preproc" -OkCount $OkCount -FailCount $FailCount -Total $Total
     return @{ Failed = $(if ($FailCount -gt 0) { 1 } else { 0 }); Ok = $OkCount; Fail = $FailCount }
@@ -354,10 +381,15 @@ function Invoke-PreprocSamples {
 function Invoke-TokenizeSamples {
     $OkCount = 0
     $FailCount = 0
-    $Rows = New-TableRows
     $ResultsDir = Join-Path $Root ".results" "tokenize"
     New-Item -ItemType Directory -Force -Path $ResultsDir | Out-Null
     $CliOpts = "-v … -w none"
+
+    Start-ResultTable `
+        -Samples (Get-AllSampleNames) `
+        -Inputs @("mxeml", "teml", "eml") `
+        -Outputs @("tokens") `
+        -OptionsList @($CliOpts, "")
 
     foreach ($Sample in $script:MxemlSamples) {
         $Base = Get-SampleBaseName $Sample
@@ -365,11 +397,11 @@ function Invoke-TokenizeSamples {
         & $script:Eml --no-logo --no-color tokenize `
             -i $Sample.FullName @SampleVarArgs -o $OutPath
         if ($LASTEXITCODE -ne 0) {
-            Add-TableRow $Rows $Base "mxeml" "tokens" $CliOpts $false "exit $LASTEXITCODE"
+            Write-ResultRow $Base "mxeml" "tokens" $CliOpts $false "exit $LASTEXITCODE"
             $FailCount++
         }
         else {
-            Add-TableRow $Rows $Base "mxeml" "tokens" $CliOpts $true
+            Write-ResultRow $Base "mxeml" "tokens" $CliOpts $true
             $OkCount++
         }
     }
@@ -380,11 +412,11 @@ function Invoke-TokenizeSamples {
         & $script:Eml --no-logo --no-color tokenize `
             -i $Sample.FullName @SampleVarArgs -o $OutPath
         if ($LASTEXITCODE -ne 0) {
-            Add-TableRow $Rows $Base "teml" "tokens" $CliOpts $false "exit $LASTEXITCODE"
+            Write-ResultRow $Base "teml" "tokens" $CliOpts $false "exit $LASTEXITCODE"
             $FailCount++
         }
         else {
-            Add-TableRow $Rows $Base "teml" "tokens" $CliOpts $true
+            Write-ResultRow $Base "teml" "tokens" $CliOpts $true
             $OkCount++
         }
     }
@@ -396,16 +428,15 @@ function Invoke-TokenizeSamples {
         $OutPath = Join-Path $ResultsDir ($Base + ".eml.tokens")
         & $script:Eml --no-logo --no-color tokenize -i $File.FullName -o $OutPath
         if ($LASTEXITCODE -ne 0) {
-            Add-TableRow $Rows $Base "eml" "tokens" "" $false "exit $LASTEXITCODE"
+            Write-ResultRow $Base "eml" "tokens" "" $false "exit $LASTEXITCODE"
             $FailCount++
         }
         else {
-            Add-TableRow $Rows $Base "eml" "tokens" "" $true
+            Write-ResultRow $Base "eml" "tokens" "" $true
             $OkCount++
         }
     }
 
-    Write-ResultTable $Rows
     $Total = $OkCount + $FailCount
     Write-OpSummary -Op "tokenize" -OkCount $OkCount -FailCount $FailCount -Total $Total
     return @{ Failed = $(if ($FailCount -gt 0) { 1 } else { 0 }); Ok = $OkCount; Fail = $FailCount }
@@ -420,9 +451,8 @@ function Get-ParseOutputFormats {
     )
 }
 
-function Add-ParseFormatRows {
+function Write-ParseFormatRows {
     param(
-        [System.Collections.Generic.List[hashtable]] $Rows,
         [string] $InputPath,
         [string] $Base,
         [string] $InputFormat,
@@ -438,11 +468,11 @@ function Add-ParseFormatRows {
         & $script:Eml --no-logo --no-color parse `
             -i $InputPath @SampleVarArgs -of $Fmt.Of -o $OutPath
         if ($LASTEXITCODE -ne 0) {
-            Add-TableRow $Rows $Base $InputFormat $Fmt.Of $CliOpts $false "exit $LASTEXITCODE"
+            Write-ResultRow $Base $InputFormat $Fmt.Of $CliOpts $false "exit $LASTEXITCODE"
             $FailCount.Value++
         }
         else {
-            Add-TableRow $Rows $Base $InputFormat $Fmt.Of $CliOpts $true
+            Write-ResultRow $Base $InputFormat $Fmt.Of $CliOpts $true
             $OkCount.Value++
         }
     }
@@ -451,20 +481,25 @@ function Add-ParseFormatRows {
 function Invoke-ParseSamples {
     $OkCount = 0
     $FailCount = 0
-    $Rows = New-TableRows
     $ResultsDir = Join-Path $Root ".results" "parse"
     New-Item -ItemType Directory -Force -Path $ResultsDir | Out-Null
     $CliOpts = "-v … -w none"
 
+    Start-ResultTable `
+        -Samples (Get-AllSampleNames) `
+        -Inputs @("mxeml", "teml", "eml", "beml") `
+        -Outputs @("mermaid", "md", "dot", "svg") `
+        -OptionsList @($CliOpts, "")
+
     foreach ($Sample in $script:MxemlSamples) {
         $Base = Get-SampleBaseName $Sample
-        Add-ParseFormatRows $Rows $Sample.FullName $Base "mxeml" $ResultsDir "mxeml" `
+        Write-ParseFormatRows $Sample.FullName $Base "mxeml" $ResultsDir "mxeml" `
             $CliOpts ([ref]$OkCount) ([ref]$FailCount)
     }
 
     foreach ($Sample in $script:TemlSamples) {
         $Base = Get-SampleBaseName $Sample
-        Add-ParseFormatRows $Rows $Sample.FullName $Base "teml" $ResultsDir "teml" `
+        Write-ParseFormatRows $Sample.FullName $Base "teml" $ResultsDir "teml" `
             $CliOpts ([ref]$OkCount) ([ref]$FailCount)
     }
 
@@ -473,26 +508,24 @@ function Invoke-ParseSamples {
     $EmlFiles = @(Get-ChildItem -LiteralPath $script:ChainDir -Filter "*.eml" | Sort-Object Name)
     foreach ($File in $EmlFiles) {
         $Base = Get-SampleBaseName $File
-        Add-ParseFormatRows $Rows $File.FullName $Base "eml" $ResultsDir "eml" `
+        Write-ParseFormatRows $File.FullName $Base "eml" $ResultsDir "eml" `
             "" ([ref]$OkCount) ([ref]$FailCount)
     }
 
     $BemlFiles = @(Get-ChildItem -LiteralPath $script:ChainDir -Filter "*.beml" | Sort-Object Name)
     foreach ($File in $BemlFiles) {
         $Base = Get-SampleBaseName $File
-        Add-ParseFormatRows $Rows $File.FullName $Base "beml" $ResultsDir "beml" `
+        Write-ParseFormatRows $File.FullName $Base "beml" $ResultsDir "beml" `
             "" ([ref]$OkCount) ([ref]$FailCount)
     }
 
-    Write-ResultTable $Rows
     $Total = $OkCount + $FailCount
     Write-OpSummary -Op "parse" -OkCount $OkCount -FailCount $FailCount -Total $Total
     return @{ Failed = $(if ($FailCount -gt 0) { 1 } else { 0 }); Ok = $OkCount; Fail = $FailCount }
 }
 
-function Add-CompileFormatRow {
+function Write-CompileFormatRow {
     param(
-        [System.Collections.Generic.List[hashtable]] $Rows,
         [string] $InputPath,
         [string] $Base,
         [string] $InputFormat,
@@ -512,11 +545,11 @@ function Add-CompileFormatRow {
         -i $InputPath @Extra -of $OutputFormat -o $OutPath
 
     if ($LASTEXITCODE -ne 0) {
-        Add-TableRow $Rows $Base $InputFormat $OutputFormat $CliOpts $false "exit $LASTEXITCODE"
+        Write-ResultRow $Base $InputFormat $OutputFormat $CliOpts $false "exit $LASTEXITCODE"
         $FailCount.Value++
     }
     else {
-        Add-TableRow $Rows $Base $InputFormat $OutputFormat $CliOpts $true
+        Write-ResultRow $Base $InputFormat $OutputFormat $CliOpts $true
         $OkCount.Value++
     }
 }
@@ -524,24 +557,29 @@ function Add-CompileFormatRow {
 function Invoke-CompileSamples {
     $OkCount = 0
     $FailCount = 0
-    $Rows = New-TableRows
     $ResultsDir = Join-Path $Root ".results" "compile"
     New-Item -ItemType Directory -Force -Path $ResultsDir | Out-Null
     $CliOpts = "-v … -w none"
 
+    Start-ResultTable `
+        -Samples (Get-AllSampleNames) `
+        -Inputs @("mxeml", "teml", "eml", "beml") `
+        -Outputs @("beml", "eml") `
+        -OptionsList @($CliOpts, "")
+
     foreach ($Sample in $script:MxemlSamples) {
         $Base = Get-SampleBaseName $Sample
-        Add-CompileFormatRow $Rows $Sample.FullName $Base "mxeml" "beml" `
+        Write-CompileFormatRow $Sample.FullName $Base "mxeml" "beml" `
             (Join-Path $ResultsDir ($Base + ".beml")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
-        Add-CompileFormatRow $Rows $Sample.FullName $Base "mxeml" "eml" `
+        Write-CompileFormatRow $Sample.FullName $Base "mxeml" "eml" `
             (Join-Path $ResultsDir ($Base + ".eml")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
     }
 
     foreach ($Sample in $script:TemlSamples) {
         $Base = Get-SampleBaseName $Sample
-        Add-CompileFormatRow $Rows $Sample.FullName $Base "teml" "beml" `
+        Write-CompileFormatRow $Sample.FullName $Base "teml" "beml" `
             (Join-Path $ResultsDir ($Base + ".beml")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
-        Add-CompileFormatRow $Rows $Sample.FullName $Base "teml" "eml" `
+        Write-CompileFormatRow $Sample.FullName $Base "teml" "eml" `
             (Join-Path $ResultsDir ($Base + ".eml")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
     }
 
@@ -550,18 +588,17 @@ function Invoke-CompileSamples {
     $EmlFiles = @(Get-ChildItem -LiteralPath $script:ChainDir -Filter "*.eml" | Sort-Object Name)
     foreach ($File in $EmlFiles) {
         $Base = Get-SampleBaseName $File
-        Add-CompileFormatRow $Rows $File.FullName $Base "eml" "beml" `
+        Write-CompileFormatRow $File.FullName $Base "eml" "beml" `
             (Join-Path $ResultsDir ($Base + ".from_eml.beml")) "" ([ref]$OkCount) ([ref]$FailCount)
     }
 
     $BemlFiles = @(Get-ChildItem -LiteralPath $script:ChainDir -Filter "*.beml" | Sort-Object Name)
     foreach ($File in $BemlFiles) {
         $Base = Get-SampleBaseName $File
-        Add-CompileFormatRow $Rows $File.FullName $Base "beml" "eml" `
+        Write-CompileFormatRow $File.FullName $Base "beml" "eml" `
             (Join-Path $ResultsDir ($Base + ".from_beml.eml")) "" ([ref]$OkCount) ([ref]$FailCount)
     }
 
-    Write-ResultTable $Rows
     $Total = $OkCount + $FailCount
     Write-OpSummary -Op "compile" -OkCount $OkCount -FailCount $FailCount -Total $Total
     return @{ Failed = $(if ($FailCount -gt 0) { 1 } else { 0 }); Ok = $OkCount; Fail = $FailCount }
