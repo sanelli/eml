@@ -3,6 +3,7 @@ with Regex_Automata;
 package body Expr_Tokenizer is
 
    use Ada.Strings.Unbounded;
+   use Eml.Diagnostics;
 
    Whitespace : constant Regex_Automata.Engine :=
      Regex_Automata.Compile ("[ \t\n\r]+");
@@ -24,6 +25,8 @@ package body Expr_Tokenizer is
      Regex_Automata.Compile ("\(");
    RParen_Pat : constant Regex_Automata.Engine :=
      Regex_Automata.Compile ("\)");
+   Comma_Pat : constant Regex_Automata.Engine :=
+     Regex_Automata.Compile (",");
 
    function Kind_Name (Kind : Token_Kind) return String is
    begin
@@ -42,6 +45,8 @@ package body Expr_Tokenizer is
             return "LPAREN";
          when RParen =>
             return "RPAREN";
+         when Comma =>
+            return "COMMA";
          when Number =>
             return "NUMBER";
          when Function_Name =>
@@ -52,7 +57,8 @@ package body Expr_Tokenizer is
    end Kind_Name;
 
    function Is_Function (Word : String) return Boolean is
-     (Word = "log"
+     (Word = "eml"
+      or else Word = "log"
       or else Word = "sin"
       or else Word = "cos"
       or else Word = "tan"
@@ -164,8 +170,9 @@ package body Expr_Tokenizer is
       end Emit_Token;
 
       procedure Emit_Diag
-        (L, C : Positive;
-         Message : String;
+        (L, C    : Positive;
+         Id      : Diagnostic_Id;
+         Param1  : String;
          From_Var : Boolean;
          Var      : Unbounded_String)
       is
@@ -176,9 +183,10 @@ package body Expr_Tokenizer is
          end if;
          Diag_Count := Diag_Count + 1;
          Diags_Buf (Diag_Count) :=
-           (Line     => L,
+           (Id       => Id,
+            Line     => L,
             Column   => C,
-            Message  => To_Unbounded_String (Message),
+            Param1   => To_Unbounded_String (Param1),
             From_Var => From_Var,
             Var_Name => Var);
       end Emit_Diag;
@@ -262,7 +270,8 @@ package body Expr_Tokenizer is
                            Emit_Diag
                              (Start_Line,
                               Start_Column,
-                              "unknown identifier '" & Word & "'",
+                              MX_Unknown_Identifier,
+                              Word,
                               (if Use_Origins then Orig.From_Var else False),
                               (if Use_Origins then Orig.Var_Name
                                else Null_Unbounded_String));
@@ -368,6 +377,20 @@ package body Expr_Tokenizer is
                          else Null_Unbounded_String));
                      Advance_Position (Source, Pos, 1, Line, Column);
                      Pos := Pos + 1;
+                  elsif Match (Comma_Pat, Pos) > 0 then
+                     if Use_Origins then
+                        Orig := Origin_At (Origins, Start_Pos);
+                     end if;
+                     Emit_Token
+                       (Comma,
+                        ",",
+                        Start_Line,
+                        Start_Column,
+                        (if Use_Origins then Orig.From_Var else False),
+                        (if Use_Origins then Orig.Var_Name
+                         else Null_Unbounded_String));
+                     Advance_Position (Source, Pos, 1, Line, Column);
+                     Pos := Pos + 1;
                   else
                      if Use_Origins then
                         Orig := Origin_At (Origins, Start_Pos);
@@ -375,9 +398,8 @@ package body Expr_Tokenizer is
                      Emit_Diag
                        (Start_Line,
                         Start_Column,
-                        "unexpected character '"
-                        & Source (Pos .. Pos)
-                        & "'",
+                        MX_Unexpected_Character,
+                        Source (Pos .. Pos),
                         (if Use_Origins then Orig.From_Var else False),
                         (if Use_Origins then Orig.Var_Name
                          else Null_Unbounded_String));

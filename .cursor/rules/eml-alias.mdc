@@ -9,6 +9,17 @@ The product, operator, files, and CLI are **EML** / `eml`. The paper calls the o
 
 If the user says **elm**, **ELM**, **.elm**, **.telm**, or `elm …` in chat, interpret that as **eml**, **EML**, **.eml**, **.teml**, or `eml …` unless they clearly mean something else.
 
+## Format names (do not confuse)
+
+| Name | Meaning |
+|---|---|
+| **mxeml** / `.mxeml` | Mathematical expression language (former math `.teml`) |
+| **teml** / `.teml` | Nested tree text only (`1` \| `eml(S, S)`) |
+| **eml** / `.eml` | Stack IR text (`ONE` / `EML`) |
+| **beml** / `.beml` | Binary stack IR |
+
+If the user says “math `.teml`”, “source expression `.teml`”, or refers to the old math language as `.teml`, they mean **`.mxeml`** / `mxeml`. Nested tree files are `.teml`.
+
 ## Keep these as elm
 
 - The local clone folder name (this checkout may stay `elm`)
@@ -17,6 +28,7 @@ If the user says **elm**, **ELM**, **.elm**, **.telm**, or `elm …` in chat, in
 
 ## Examples
 
-- “run elm tokenize on that .telm” → `eml tokenize` on a `.teml` file
+- “run elm tokenize on that .telm” → `eml tokenize` on a `.teml` file (nested), unless they clearly mean the math language → then `.mxeml`
+- “math source” / “operators and sin/cos” → `.mxeml`
 - “IR ELM” / `elm(x, y)` → IR EML / `eml(x, y)`
 - “add a test in elm_tests” → `tests/eml_tests.adb`

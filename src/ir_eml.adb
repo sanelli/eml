@@ -90,6 +90,272 @@ package body IR_Eml is
       return new Opcode_Array'(Ops);
    end Flatten;
 
+   function Unflatten (Ops : Opcode_Array) return Node_Access is
+      Stack : array (1 .. Ops'Length + 1) of Node_Access;
+      Top   : Natural := 0;
+   begin
+      if Ops'Length = 0 then
+         return null;
+      end if;
+      for I in Ops'Range loop
+         case Ops (I) is
+            when One =>
+               Top := Top + 1;
+               Stack (Top) := Make_One;
+            when Eml =>
+               if Top < 2 then
+                  return null;
+               end if;
+               declare
+                  Y : constant Node_Access := Stack (Top);
+                  X : constant Node_Access := Stack (Top - 1);
+               begin
+                  Top := Top - 2;
+                  Top := Top + 1;
+                  Stack (Top) := Make_Eml (X, Y);
+               end;
+         end case;
+      end loop;
+      if Top /= 1 then
+         return null;
+      end if;
+      return Stack (1);
+   end Unflatten;
+
+   function Unflatten (Ops : Opcode_Array_Access) return Node_Access is
+   begin
+      if Ops = null or else Ops'Length = 0 then
+         return null;
+      end if;
+      return Unflatten (Ops.all);
+   end Unflatten;
+
+   function Trim_Pos (N : Positive) return String is
+      S : constant String := Positive'Image (N);
+   begin
+      if S (S'First) = ' ' then
+         return S (S'First + 1 .. S'Last);
+      end if;
+      return S;
+   end Trim_Pos;
+
+   function Ir_Node_Label (N : Node_Access) return String is
+   begin
+      case N.Kind is
+         when One_Node =>
+            return "1";
+         when Eml_Node =>
+            if Length (N.Comment) > 0 then
+               return "eml (" & To_String (N.Comment) & ")";
+            else
+               return "eml";
+            end if;
+      end case;
+   end Ir_Node_Label;
+
+   type Id_Map is array (Positive range <>) of Node_Access;
+
+   procedure Count_Ir_Nodes (N : Node_Access; Count : in out Natural) is
+   begin
+      if N = null then
+         return;
+      end if;
+      Count := Count + 1;
+      Count_Ir_Nodes (N.Left, Count);
+      Count_Ir_Nodes (N.Right, Count);
+   end Count_Ir_Nodes;
+
+   procedure Assign_Ir_Ids
+     (N : Node_Access; Map : in out Id_Map; Next : in out Positive)
+   is
+   begin
+      if N = null then
+         return;
+      end if;
+      Map (Next) := N;
+      Next := Next + 1;
+      Assign_Ir_Ids (N.Left, Map, Next);
+      Assign_Ir_Ids (N.Right, Map, Next);
+   end Assign_Ir_Ids;
+
+   function Find_Ir_Id (Map : Id_Map; Target : Node_Access) return Positive is
+   begin
+      for I in Map'Range loop
+         if Map (I) = Target then
+            return I;
+         end if;
+      end loop;
+      raise Program_Error with "IR node not in id map";
+   end Find_Ir_Id;
+
+   function Format_Tree_Mermaid (Root : Node_Access) return String is
+      Total  : Natural := 0;
+      Buffer : Unbounded_String;
+   begin
+      Count_Ir_Nodes (Root, Total);
+      if Total = 0 then
+         return "flowchart TD";
+      end if;
+      declare
+         Map  : Id_Map (1 .. Total);
+         Next : Positive := 1;
+      begin
+         Assign_Ir_Ids (Root, Map, Next);
+         Append (Buffer, "flowchart TD");
+         Append (Buffer, ASCII.LF);
+         for I in Map'Range loop
+            Append
+              (Buffer,
+               "  n"
+               & Trim_Pos (I)
+               & "["""
+               & Ir_Node_Label (Map (I))
+               & """]");
+            Append (Buffer, ASCII.LF);
+         end loop;
+         for I in Map'Range loop
+            declare
+               N : constant Node_Access := Map (I);
+            begin
+               if N.Left /= null then
+                  Append
+                    (Buffer,
+                     "  n"
+                     & Trim_Pos (I)
+                     & " --> n"
+                     & Trim_Pos (Find_Ir_Id (Map, N.Left)));
+                  Append (Buffer, ASCII.LF);
+               end if;
+               if N.Right /= null then
+                  Append
+                    (Buffer,
+                     "  n"
+                     & Trim_Pos (I)
+                     & " --> n"
+                     & Trim_Pos (Find_Ir_Id (Map, N.Right)));
+                  Append (Buffer, ASCII.LF);
+               end if;
+            end;
+         end loop;
+         declare
+            S : constant String := To_String (Buffer);
+         begin
+            if S'Length > 0 and then S (S'Last) = ASCII.LF then
+               return S (S'First .. S'Last - 1);
+            end if;
+            return S;
+         end;
+      end;
+   end Format_Tree_Mermaid;
+
+   function Format_Tree_Markdown (Root : Node_Access) return String is
+      M : constant String := Format_Tree_Mermaid (Root);
+   begin
+      return "# Syntax tree" & ASCII.LF & ASCII.LF
+        & "```mermaid" & ASCII.LF & M & ASCII.LF & "```";
+   end Format_Tree_Markdown;
+
+   function Format_Tree_Dot (Root : Node_Access) return String is
+      Total  : Natural := 0;
+      Buffer : Unbounded_String;
+   begin
+      Count_Ir_Nodes (Root, Total);
+      if Total = 0 then
+         return "digraph syntaxtree {}";
+      end if;
+      declare
+         Map  : Id_Map (1 .. Total);
+         Next : Positive := 1;
+      begin
+         Assign_Ir_Ids (Root, Map, Next);
+         Append (Buffer, "digraph syntaxtree {");
+         Append (Buffer, ASCII.LF);
+         for I in Map'Range loop
+            Append
+              (Buffer,
+               "  n"
+               & Trim_Pos (I)
+               & " [label="""
+               & Ir_Node_Label (Map (I))
+               & """];");
+            Append (Buffer, ASCII.LF);
+         end loop;
+         for I in Map'Range loop
+            declare
+               N : constant Node_Access := Map (I);
+            begin
+               if N.Left /= null then
+                  Append
+                    (Buffer,
+                     "  n"
+                     & Trim_Pos (I)
+                     & " -> n"
+                     & Trim_Pos (Find_Ir_Id (Map, N.Left))
+                     & ";");
+                  Append (Buffer, ASCII.LF);
+               end if;
+               if N.Right /= null then
+                  Append
+                    (Buffer,
+                     "  n"
+                     & Trim_Pos (I)
+                     & " -> n"
+                     & Trim_Pos (Find_Ir_Id (Map, N.Right))
+                     & ";");
+                  Append (Buffer, ASCII.LF);
+               end if;
+            end;
+         end loop;
+         Append (Buffer, "}");
+         return To_String (Buffer);
+      end;
+   end Format_Tree_Dot;
+
+   function Format_Tree_Svg (Root : Node_Access) return String is
+   begin
+      return Format_Tree_Mermaid (Root);
+   end Format_Tree_Svg;
+
+   function Format_Tree
+     (Root : Node_Access; Fmt : Tree_Output_Format) return String
+   is
+   begin
+      case Fmt is
+         when Mermaid =>
+            return Format_Tree_Mermaid (Root);
+         when Markdown =>
+            return Format_Tree_Markdown (Root);
+         when Dot =>
+            return Format_Tree_Dot (Root);
+         when Svg =>
+            return Format_Tree_Svg (Root);
+      end case;
+   end Format_Tree;
+
+   procedure Write_Tree_To_File
+     (Root : Node_Access;
+      Fmt  : Tree_Output_Format;
+      Path : String)
+   is
+      File : Ada.Text_IO.File_Type;
+      Text : constant String := Format_Tree (Root, Fmt);
+   begin
+      Ada.Text_IO.Create (File, Ada.Text_IO.Out_File, Path);
+      Ada.Text_IO.Put (File, Text);
+      Ada.Text_IO.Close (File);
+   end Write_Tree_To_File;
+
+   procedure Write_Tree_To_Stdout
+     (Root : Node_Access; Fmt : Tree_Output_Format)
+   is
+      Text : constant String := Format_Tree (Root, Fmt);
+   begin
+      Ada.Text_IO.Put (Ada.Text_IO.Standard_Output, Text);
+      if Text'Length = 0 or else Text (Text'Last) /= ASCII.LF then
+         Ada.Text_IO.New_Line (Ada.Text_IO.Standard_Output);
+      end if;
+   end Write_Tree_To_Stdout;
+
    function UTC_Image (T : Time) return String is
    begin
       return Image (T, Time_Zone => 0) & " UTC";

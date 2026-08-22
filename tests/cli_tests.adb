@@ -75,7 +75,7 @@ package body CLI_Tests is
    begin
       declare
          In_Path  : constant String :=
-           Write_Temp ("cli_ok.teml", "sin(pi+$X)");
+           Write_Temp ("cli_ok.mxeml", "sin(pi+$X)");
          Out_Path : constant String :=
            Ada.Directories.Compose (Temp_Dir, "cli_ok.tokens");
          Args     : constant Eml.CLI.Arg_Array :=
@@ -114,7 +114,7 @@ package body CLI_Tests is
 
       declare
          In_Path  : constant String :=
-           Write_Temp ("cli_long.teml", "1+2");
+           Write_Temp ("cli_long.mxeml", "1+2");
          Out_Path : constant String :=
            Ada.Directories.Compose (Temp_Dir, "cli_long.tokens");
          Args     : constant Eml.CLI.Arg_Array :=
@@ -137,7 +137,7 @@ package body CLI_Tests is
       end;
 
       declare
-         In_Path  : constant String := Write_Temp ("cli_empty.teml", "");
+         In_Path  : constant String := Write_Temp ("cli_empty.mxeml", "");
          Out_Path : constant String :=
            Ada.Directories.Compose (Temp_Dir, "cli_empty.tokens");
          Args     : constant Eml.CLI.Arg_Array :=
@@ -156,7 +156,7 @@ package body CLI_Tests is
 
       declare
          In_Path  : constant String :=
-           Write_Temp ("cli_bad.teml", "1+@2");
+           Write_Temp ("cli_bad.mxeml", "1+@2");
          Out_Path : constant String :=
            Ada.Directories.Compose (Temp_Dir, "cli_bad.tokens");
          Args     : constant Eml.CLI.Arg_Array :=
@@ -193,7 +193,7 @@ package body CLI_Tests is
 
       declare
          In_Path  : constant String :=
-           Write_Temp ("cli_parse_ok.teml", "1+2*3");
+           Write_Temp ("cli_parse_ok.mxeml", "1+2*3");
          Out_Path : constant String :=
            Ada.Directories.Compose (Temp_Dir, "cli_parse_ok.syntaxtree");
          Args     : constant Eml.CLI.Arg_Array :=
@@ -232,7 +232,7 @@ package body CLI_Tests is
 
       declare
          In_Path  : constant String :=
-           Write_Temp ("cli_parse_md.teml", "1+2");
+           Write_Temp ("cli_parse_md.mxeml", "1+2");
          Out_Path : constant String :=
            Ada.Directories.Compose (Temp_Dir, "cli_parse_md.md");
          Args     : constant Eml.CLI.Arg_Array :=
@@ -259,7 +259,7 @@ package body CLI_Tests is
 
       declare
          In_Path  : constant String :=
-           Write_Temp ("cli_parse_dot.teml", "1+2");
+           Write_Temp ("cli_parse_dot.mxeml", "1+2");
          Out_Path : constant String :=
            Ada.Directories.Compose (Temp_Dir, "cli_parse_dot.dot");
          Args     : constant Eml.CLI.Arg_Array :=
@@ -284,7 +284,7 @@ package body CLI_Tests is
 
       declare
          In_Path  : constant String :=
-           Write_Temp ("cli_parse_svg.teml", "1+2");
+           Write_Temp ("cli_parse_svg.mxeml", "1+2");
          Out_Path : constant String :=
            Ada.Directories.Compose (Temp_Dir, "cli_parse_svg.svg");
          Args     : constant Eml.CLI.Arg_Array :=
@@ -308,7 +308,7 @@ package body CLI_Tests is
 
       declare
          In_Path : constant String :=
-           Write_Temp ("cli_parse_badext.teml", "1");
+           Write_Temp ("cli_parse_badext.mxeml", "1");
          Args    : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("--no-color"),
@@ -328,7 +328,7 @@ package body CLI_Tests is
 
       declare
          In_Path : constant String :=
-           Write_Temp ("cli_parse_badfmt.teml", "1");
+           Write_Temp ("cli_parse_badfmt.mxeml", "1");
          Args    : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("--no-color"),
@@ -346,7 +346,7 @@ package body CLI_Tests is
 
       declare
          In_Path  : constant String :=
-           Write_Temp ("cli_parse_lex.teml", "1+@2");
+           Write_Temp ("cli_parse_lex.mxeml", "1+@2");
          Out_Path : constant String :=
            Ada.Directories.Compose
              (Temp_Dir, "cli_parse_lex.syntaxtree");
@@ -373,7 +373,7 @@ package body CLI_Tests is
 
       declare
          In_Path  : constant String :=
-           Write_Temp ("cli_parse_err.teml", "1+");
+           Write_Temp ("cli_parse_err.mxeml", "1+");
          Out_Path : constant String :=
            Ada.Directories.Compose
              (Temp_Dir, "cli_parse_err.syntaxtree");
@@ -431,7 +431,7 @@ package body CLI_Tests is
 
       declare
          In_Path : constant String :=
-           Write_Temp ("cli_outext.teml", "1");
+           Write_Temp ("cli_outext.mxeml", "1");
          Args    : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("--no-color"),
@@ -452,7 +452,7 @@ package body CLI_Tests is
             A ("--no-color"),
             A ("tokenize"),
             A ("-i"),
-            A ("obj/does_not_exist.teml")];
+            A ("obj/does_not_exist.mxeml")];
          Status : constant Ada.Command_Line.Exit_Status :=
            Eml.CLI.Run (Args);
       begin
@@ -536,7 +536,7 @@ package body CLI_Tests is
            [A ("--no-logo"),
             A ("--no-color"),
             A ("--input"),
-            A ("samples/01_trig_basics.teml")];
+            A ("samples/01_trig_basics.mxeml")];
          Status : constant Ada.Command_Line.Exit_Status :=
            Eml.CLI.Run (Args);
       begin
@@ -546,9 +546,9 @@ package body CLI_Tests is
 
       declare
          In_Path  : constant String :=
-           Write_Temp ("cli_preproc_id.teml", "1+2");
+           Write_Temp ("cli_preproc_id.mxeml", "1+2");
          Out_Path : constant String :=
-           Ada.Directories.Compose (Temp_Dir, "cli_preproc_id.teml");
+           Ada.Directories.Compose (Temp_Dir, "cli_preproc_id.mxeml");
          Args     : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("preproc"),
@@ -564,9 +564,10 @@ package body CLI_Tests is
       end;
 
       declare
-         In_Path  : constant String := Write_Temp ("cli_preproc_x.teml", "$X");
+         In_Path  : constant String :=
+           Write_Temp ("cli_preproc_x.mxeml", "$X");
          Out_Path : constant String :=
-           Ada.Directories.Compose (Temp_Dir, "cli_preproc_x.teml");
+           Ada.Directories.Compose (Temp_Dir, "cli_preproc_x.mxeml");
          Args     : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("preproc"),
@@ -585,9 +586,9 @@ package body CLI_Tests is
 
       declare
          In_Path : constant String :=
-           Write_Temp ("cli_unbound.teml", "$X");
+           Write_Temp ("cli_unbound.mxeml", "$X");
          Out_Path : constant String :=
-           Ada.Directories.Compose (Temp_Dir, "cli_unbound.teml");
+           Ada.Directories.Compose (Temp_Dir, "cli_unbound.mxeml");
          Args    : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("--no-color"),
@@ -610,7 +611,7 @@ package body CLI_Tests is
 
       declare
          In_Path : constant String :=
-           Write_Temp ("cli_warn_err.teml", "1");
+           Write_Temp ("cli_warn_err.mxeml", "1");
          Out_Path : constant String :=
            Ada.Directories.Compose (Temp_Dir, "cli_warn_err.tokens");
          Args    : constant Eml.CLI.Arg_Array :=
@@ -639,7 +640,7 @@ package body CLI_Tests is
 
       declare
          In_Path : constant String :=
-           Write_Temp ("cli_warn_bad.teml", "1");
+           Write_Temp ("cli_warn_bad.mxeml", "1");
          Args    : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("--no-color"),
@@ -657,7 +658,7 @@ package body CLI_Tests is
 
       declare
          In_Path : constant String :=
-           Write_Temp ("cli_preproc_badext.teml", "1");
+           Write_Temp ("cli_preproc_badext.mxeml", "1");
          Args    : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("--no-color"),
@@ -684,7 +685,7 @@ package body CLI_Tests is
       end;
 
       declare
-         In_Path  : constant String := Write_Temp ("cli_compile_e.teml", "e");
+         In_Path  : constant String := Write_Temp ("cli_compile_e.mxeml", "e");
          Out_Path : constant String :=
            Ada.Directories.Compose (Temp_Dir, "cli_compile_e.beml");
          Args     : constant Eml.CLI.Arg_Array :=
@@ -709,7 +710,7 @@ package body CLI_Tests is
 
       declare
          In_Path  : constant String :=
-           Write_Temp ("cli_compile_eml.teml", "e");
+           Write_Temp ("cli_compile_eml.mxeml", "e");
          Out_Path : constant String :=
            Ada.Directories.Compose (Temp_Dir, "cli_compile_eml.eml");
          Args     : constant Eml.CLI.Arg_Array :=
@@ -719,7 +720,7 @@ package body CLI_Tests is
             A (In_Path),
             A ("-o"),
             A (Out_Path),
-            A ("-f"),
+            A ("-of"),
             A ("eml")];
          Status   : constant Ada.Command_Line.Exit_Status :=
            Eml.CLI.Run (Args);
@@ -740,7 +741,7 @@ package body CLI_Tests is
 
       declare
          In_Path : constant String :=
-           Write_Temp ("cli_compile_fmt.teml", "1");
+           Write_Temp ("cli_compile_fmt.mxeml", "1");
          Out_Path : constant String :=
            Ada.Directories.Compose (Temp_Dir, "cli_compile_fmt.beml");
          Args    : constant Eml.CLI.Arg_Array :=
@@ -748,7 +749,7 @@ package body CLI_Tests is
             A ("compile"),
             A ("-i"),
             A (In_Path),
-            A ("--format"),
+            A ("--output-format"),
             A ("beml"),
             A ("-o"),
             A (Out_Path)];
@@ -761,7 +762,7 @@ package body CLI_Tests is
 
       declare
          In_Path : constant String :=
-           Write_Temp ("cli_compile_alias.teml", "1");
+           Write_Temp ("cli_compile_alias.mxeml", "1");
          Out_Path : constant String :=
            Ada.Directories.Compose (Temp_Dir, "cli_compile_alias.eml");
          Args    : constant Eml.CLI.Arg_Array :=
@@ -769,7 +770,7 @@ package body CLI_Tests is
             A ("compile"),
             A ("-i"),
             A (In_Path),
-            A ("-f"),
+            A ("-of"),
             A ("eml"),
             A ("-o"),
             A (Out_Path)];
@@ -782,7 +783,7 @@ package body CLI_Tests is
 
       declare
          In_Path : constant String :=
-           Write_Temp ("cli_compile_order.teml", "1");
+           Write_Temp ("cli_compile_order.mxeml", "1");
          Out_Path : constant String :=
            Ada.Directories.Compose (Temp_Dir, "cli_compile_order.beml");
          Args    : constant Eml.CLI.Arg_Array :=
@@ -801,7 +802,7 @@ package body CLI_Tests is
 
       declare
          In_Path : constant String :=
-           Write_Temp ("cli_compile_var.teml", "1+$X");
+           Write_Temp ("cli_compile_var.mxeml", "1+$X");
          Out_Path : constant String :=
            Ada.Directories.Compose (Temp_Dir, "cli_compile_var.beml");
          Args    : constant Eml.CLI.Arg_Array :=
@@ -824,13 +825,13 @@ package body CLI_Tests is
 
       declare
          In_Path : constant String :=
-           Write_Temp ("cli_compile_stdout.teml", "e");
+           Write_Temp ("cli_compile_stdout.mxeml", "e");
          Args    : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("compile"),
             A ("-i"),
             A (In_Path),
-            A ("-f"),
+            A ("-of"),
             A ("eml")];
          Status  : constant Ada.Command_Line.Exit_Status :=
            Eml.CLI.Run (Args);
@@ -867,7 +868,7 @@ package body CLI_Tests is
 
       declare
          In_Path  : constant String :=
-           Write_Temp ("cli_compile_mismatch.teml", "1");
+           Write_Temp ("cli_compile_mismatch.mxeml", "1");
          Out_Path : constant String :=
            Ada.Directories.Compose (Temp_Dir, "cli_compile_mismatch.eml");
          Args     : constant Eml.CLI.Arg_Array :=
@@ -888,7 +889,7 @@ package body CLI_Tests is
 
       declare
          In_Path  : constant String :=
-           Write_Temp ("cli_compile_mismatch2.teml", "1");
+           Write_Temp ("cli_compile_mismatch2.mxeml", "1");
          Out_Path : constant String :=
            Ada.Directories.Compose (Temp_Dir, "cli_compile_mismatch2.beml");
          Args     : constant Eml.CLI.Arg_Array :=
@@ -899,7 +900,7 @@ package body CLI_Tests is
             A (In_Path),
             A ("-o"),
             A (Out_Path),
-            A ("-f"),
+            A ("-of"),
             A ("eml")];
          Status   : constant Ada.Command_Line.Exit_Status :=
            Eml.CLI.Run (Args);
@@ -911,7 +912,7 @@ package body CLI_Tests is
 
       declare
          In_Path : constant String :=
-           Write_Temp ("cli_compile_of.teml", "1");
+           Write_Temp ("cli_compile_of.mxeml", "1");
          Args    : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("--no-color"),
@@ -929,14 +930,14 @@ package body CLI_Tests is
 
       declare
          In_Path : constant String :=
-           Write_Temp ("cli_parse_format.teml", "1");
+           Write_Temp ("cli_parse_format.mxeml", "1");
          Args    : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("--no-color"),
             A ("parse"),
             A ("-i"),
             A (In_Path),
-            A ("--format"),
+            A ("--output-format"),
             A ("eml")];
          Status  : constant Ada.Command_Line.Exit_Status :=
            Eml.CLI.Run (Args);
@@ -947,14 +948,14 @@ package body CLI_Tests is
 
       declare
          In_Path : constant String :=
-           Write_Temp ("cli_compile_badfmt.teml", "1");
+           Write_Temp ("cli_compile_badfmt.mxeml", "1");
          Args    : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("--no-color"),
             A ("compile"),
             A ("-i"),
             A (In_Path),
-            A ("-f"),
+            A ("-of"),
             A ("cli")];
          Status  : constant Ada.Command_Line.Exit_Status :=
            Eml.CLI.Run (Args);
@@ -965,16 +966,16 @@ package body CLI_Tests is
 
       declare
          In_Path : constant String :=
-           Write_Temp ("cli_compile_dupfmt.teml", "1");
+           Write_Temp ("cli_compile_dupfmt.mxeml", "1");
          Args    : constant Eml.CLI.Arg_Array :=
            [A ("--no-logo"),
             A ("--no-color"),
             A ("compile"),
             A ("-i"),
             A (In_Path),
-            A ("-f"),
+            A ("-of"),
             A ("eml"),
-            A ("-f"),
+            A ("-of"),
             A ("beml")];
          Status  : constant Ada.Command_Line.Exit_Status :=
            Eml.CLI.Run (Args);
@@ -985,7 +986,7 @@ package body CLI_Tests is
 
       declare
          In_Path : constant String :=
-           Write_Temp ("cli_compile_unbound.teml", "$X");
+           Write_Temp ("cli_compile_unbound.mxeml", "$X");
          Out_Path : constant String :=
            Ada.Directories.Compose (Temp_Dir, "cli_compile_unbound.beml");
          Args    : constant Eml.CLI.Arg_Array :=
@@ -1011,7 +1012,7 @@ package body CLI_Tests is
 
       declare
          In_Path : constant String :=
-           Write_Temp ("cli_compile_lex.teml", "1+@2");
+           Write_Temp ("cli_compile_lex.mxeml", "1+@2");
          Out_Path : constant String :=
            Ada.Directories.Compose (Temp_Dir, "cli_compile_lex.beml");
          Args    : constant Eml.CLI.Arg_Array :=
@@ -1037,7 +1038,7 @@ package body CLI_Tests is
 
       declare
          In_Path : constant String :=
-           Write_Temp ("cli_compile_parse.teml", "1+");
+           Write_Temp ("cli_compile_parse.mxeml", "1+");
          Out_Path : constant String :=
            Ada.Directories.Compose (Temp_Dir, "cli_compile_parse.beml");
          Args    : constant Eml.CLI.Arg_Array :=

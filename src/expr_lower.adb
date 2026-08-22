@@ -325,7 +325,19 @@ package body Expr_Lower is
             return Pow_XY (Lower (Root.Left), Lower (Root.Right));
 
          when Expr_Parser.Call_Node =>
-            return Lower_Call (To_String (Root.Lexeme), Lower (Root.Left));
+            declare
+               Name : constant String := To_String (Root.Lexeme);
+            begin
+               if Name = "eml" then
+                  return
+                    Make_Eml
+                      (Lower (Root.Left),
+                       Lower (Root.Right),
+                       "eml");
+               else
+                  return Lower_Call (Name, Lower (Root.Left));
+               end if;
+            end;
       end case;
    end Lower;
 

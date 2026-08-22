@@ -22,7 +22,7 @@ When possible, **report code coverage** for the change (tooling TBD; do not skip
 
 ## Out of scope until explicitly requested
 
-- LaTeX (or other) input besides `.teml` / `.eml`
+- LaTeX (or other) input besides `.mxeml` / `.teml` / `.eml` / `.beml`
 - Extra debug (traces, stepwise evaluation UI). `eml tokenize` and `eml parse` dumps are in scope.
 - Optimizations (algebraic simplification, EML-tree depth reduction, backend opts)
 - Programmatic VS Code features (language server, completions, diagnostics) beyond declarative editing

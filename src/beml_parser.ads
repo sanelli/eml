@@ -1,10 +1,8 @@
---  Parse stack .eml tokens into IR_Eml.
-with Ada.Strings.Unbounded;
+--  Reconstruct IR_Eml from BEML opcodes.
 with Eml.Diagnostics;
-with Eml_Tokenizer;
 with IR_Eml;
 
-package Eml_Parser is
+package Beml_Parser is
 
    type Parse_Result is record
       Root       : IR_Eml.Node_Access := null;
@@ -12,9 +10,10 @@ package Eml_Parser is
       Error_Id   : Eml.Diagnostics.Diagnostic_Id;
       Error_Line : Positive := 1;
       Error_Col  : Positive := 1;
-      Param1     : Ada.Strings.Unbounded.Unbounded_String;
    end record;
 
-   function Parse (Tokens : Eml_Tokenizer.Token_Array) return Parse_Result;
+   function Parse (Ops : IR_Eml.Opcode_Array) return Parse_Result;
 
-end Eml_Parser;
+   function Parse (Ops : IR_Eml.Opcode_Array_Access) return Parse_Result;
+
+end Beml_Parser;

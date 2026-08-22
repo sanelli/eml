@@ -1,5 +1,6 @@
---  Parse .teml tokens into a syntax tree and emit dumps.
+--  Parse .mxeml tokens into a syntax tree and emit dumps.
 with Ada.Strings.Unbounded;
+with Eml.Diagnostics;
 with Expr_Tokenizer;
 
 package Expr_Parser is
@@ -36,9 +37,10 @@ package Expr_Parser is
    type Parse_Result is record
       Root       : Node_Access := null;
       Had_Error  : Boolean := False;
+      Error_Id   : Eml.Diagnostics.Diagnostic_Id;
       Error_Line : Positive := 1;
       Error_Col  : Positive := 1;
-      Message    : Ada.Strings.Unbounded.Unbounded_String;
+      Param1     : Ada.Strings.Unbounded.Unbounded_String;
       From_Var   : Boolean := False;
       Var_Name   : Ada.Strings.Unbounded.Unbounded_String;
    end record;

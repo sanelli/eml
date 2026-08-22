@@ -1,5 +1,6 @@
 with Ada.Strings.Unbounded;
 with Ada.Text_IO;
+with Eml.Diagnostics;
 
 with Expr_Preprocessor;
 with Expr_Tokenizer;
@@ -123,7 +124,9 @@ package body Expr_Tokenizer_Tests is
             Require (R.Diagnostics (1).Line = 1, "dollar: diag line");
             Require (R.Diagnostics (1).Column = 1, "dollar: diag column");
             Require
-              (To_String (R.Diagnostics (1).Message)
+              (Eml.Diagnostics.Message
+                 (R.Diagnostics (1).Id,
+                  To_String (R.Diagnostics (1).Param1))
                = "unexpected character '$'",
                "dollar: diag message");
          end if;
@@ -143,7 +146,9 @@ package body Expr_Tokenizer_Tests is
             Require (R.Diagnostics (1).Line = 1, "percent: diag line");
             Require (R.Diagnostics (1).Column = 2, "percent: diag column");
             Require
-              (To_String (R.Diagnostics (1).Message)
+              (Eml.Diagnostics.Message
+                 (R.Diagnostics (1).Id,
+                  To_String (R.Diagnostics (1).Param1))
                = "unexpected character '%'",
                "percent: diag message");
          end if;
@@ -195,11 +200,15 @@ package body Expr_Tokenizer_Tests is
          Require_Token (R.Tokens (2), Plus, "+", 1, 2, "bad-2");
          Require_Token (R.Tokens (3), Number, "2", 1, 4, "bad-3");
          Require
-           (To_String (R.Diagnostics (1).Message)
+           (Eml.Diagnostics.Message
+              (R.Diagnostics (1).Id,
+               To_String (R.Diagnostics (1).Param1))
             = "unexpected character '@'",
             "bad: at message");
          Require
-           (To_String (R.Diagnostics (2).Message)
+           (Eml.Diagnostics.Message
+              (R.Diagnostics (2).Id,
+               To_String (R.Diagnostics (2).Param1))
             = "unknown identifier 'foo'",
             "bad: foo message");
       end;
@@ -210,7 +219,9 @@ package body Expr_Tokenizer_Tests is
          Require (R.Had_Errors, "log10: error");
          if R.Diagnostics'Length > 0 then
             Require
-              (To_String (R.Diagnostics (1).Message)
+              (Eml.Diagnostics.Message
+                 (R.Diagnostics (1).Id,
+                  To_String (R.Diagnostics (1).Param1))
                = "unknown identifier 'log10'",
                "log10: message");
          end if;
@@ -231,7 +242,9 @@ package body Expr_Tokenizer_Tests is
       declare
          R : constant Tokenize_Result := Tokenize (",");
       begin
-         Require (R.Had_Errors, "comma: error");
+         Require (not R.Had_Errors, "comma: ok");
+         Require (R.Tokens'Length = 1, "comma: count");
+         Require_Token (R.Tokens (1), Comma, ",", 1, 1, "comma");
       end;
 
       declare
@@ -269,7 +282,9 @@ package body Expr_Tokenizer_Tests is
            (To_String (R.Diagnostics (1).Var_Name) = "$Y",
             "var-lex: var-name");
          Require
-           (To_String (R.Diagnostics (1).Message)
+           (Eml.Diagnostics.Message
+              (R.Diagnostics (1).Id,
+               To_String (R.Diagnostics (1).Param1))
             = "unexpected character '@'",
             "var-lex: message");
       end;

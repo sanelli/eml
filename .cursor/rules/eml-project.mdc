@@ -8,9 +8,9 @@ alwaysApply: true
 Build:
 
 - a **single Ada executable** (`eml`) that is both a **compiler** and an **interpreter**
-- a **VS Code extension** for `.teml` / `.eml` (declarative editing; see `eml-vscode` rule)
+- a **VS Code extension** for `.mxeml` / `.teml` / `.eml` (declarative editing; see `eml-vscode` rule)
 
-The compiler reads a `.teml` source expression or a `.eml` file and emits EML text, a native binary, a .NET CLI DLL, or Java bytecode. The interpreter runs either input via `eml run`. CLI: `eml-cli`. CI/releases: `eml-ci`.
+The compiler reads one of four input formats (`.mxeml`, `.teml`, `.eml`, `.beml`) and emits stack EML text, binary `.beml`, a native binary, a .NET CLI DLL, or Java bytecode. The interpreter runs any of those inputs via `eml run`. CLI: `eml-cli`. CI/releases: `eml-ci`.
 
 Do not implement code unless the user asks for that specific chunk. Keep future extensions out of the current design unless requested.
 
@@ -32,10 +32,12 @@ The local clone folder may still be named `elm`. Do not rename that folder or an
 
 | Extension | Role |
 |---|---|
-| `.teml` | source mathematical expression |
-| `.eml` | EML text (`eml(...)` and `1`; `$VARNAME` when parameterized) |
+| `.mxeml` | mathematical source expression (operators, functions, constants, `eml(x, y)`) |
+| `.teml` | nested EML tree text (`1` and `eml(S, S)` only) |
+| `.eml` | textual stack IR (`ONE` / `EML` with optional header comments) |
+| `.beml` | packed-bit binary stack IR |
 | `.tokens` | dump from `eml tokenize` |
-| `.syntaxtree` | dump from `eml parse` |
+| `.syntaxtree` | dump from `eml parse` (default mermaid) |
 
 ## Open items (do not invent)
 

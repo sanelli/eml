@@ -5,22 +5,66 @@ alwaysApply: true
 
 # Command line
 
-The Ada executable is invoked as `eml`. Front-end is chosen from the **input extension**: `.teml` (source expression) or `.eml` (EML text).
+The Ada executable is invoked as `eml`. The front-end is chosen from the **effective input format**: `--input-format` / `-if` when set (always wins), otherwise the **input extension**. Supported formats: `mxeml`, `teml`, `eml`, `beml`.
 
 ## Global options
 
 - `--no-color` — plain-text diagnostics and usage on stderr (no ANSI color). Allowed before or after the subcommand.
 - `--no-logo` — suppress the startup banner. Allowed before or after the subcommand.
 
+## Shared input / output options
+
+On `preproc`, `tokenize`, `parse`, and `compile`:
+
+- `--input` / `-i <file>` — optional; if omitted, read **stdin** (text via newline-normalized path; **beml** via raw bytes / `Stream_IO`, never `Text_IO`)
+- `--input-format` / `-if mxeml|teml|eml|beml` — required when `-i` is omitted; optional when `-i` is present (then overrides the extension). Space-separated only (no `--input-format=`); repeated `-if` is invalid CLI
+- `--output` / `-o <file>` — optional; if omitted, command output goes to stdout
+- `--output-format` / `-of` — optional; values depend on the command (see below). Space-separated only (no `--output-format=`); repeated `-of` is invalid CLI. When `-o` is present, the extension **must match** the selected `-of`
+- `--format` / `-f` — **removed**; always invalid CLI (`unexpected --format/-f (use --output-format/-of)`)
+
+Unknown `-of` for the current command is invalid CLI. `-of` on `help` is invalid CLI. Unknown extension without `-if` → error listing the extensions valid for that command.
+
+Compile header `-- Source:` uses the `-i` path, or `<stdin>` when reading stdin.
+
 ## Shared preprocessor options
 
-On `preproc`, `tokenize`, and `parse`:
+On `preproc`, `tokenize`, `parse`, and `compile`:
 
-- `--var` / `-v $VARNAME=EXPRESSION` — repeatable; `$` required; split on first `=`; empty EXPRESSION is invalid CLI; repeated name is invalid CLI
+- `--var` / `-v $VARNAME=EXPRESSION` — repeatable; `$` required; split on first `=`; empty EXPRESSION is invalid CLI; repeated name is invalid CLI. Meaningful only for **mxeml** / **teml** (preprocessor on). On **eml** / **beml**, every `--var` is unused
 - `--warn` / `-w default|none|error` — default is `default` when omitted
   - `default` — print unused `--var` warnings (yellow stderr); do not stop
   - `none` — suppress unused `--var` warnings
   - `error` — treat unused `--var` as error (red stderr); stop before next stage
+
+## Input formats
+
+| `-if` / extension | Role | Preprocessor |
+|---|---|---|
+| `mxeml` / `.mxeml` | Mathematical expression language (operators, functions, constants, `eml(x, y)`) | on |
+| `teml` / `.teml` | Nested tree text only: `1` and `eml(S, S)` | on |
+| `eml` / `.eml` | Textual stack IR (`ONE` / `EML`, `--` comments) | off |
+| `beml` / `.beml` | Packed-bit binary stack IR | off |
+
+## Command × format
+
+| Command | Allowed inputs |
+|---|---|
+| `preproc` | `mxeml`, `teml` |
+| `tokenize` | `mxeml`, `teml`, `eml` (not `beml`) |
+| `parse` | all four |
+| `compile` | all four |
+
+Incorrect payload (bad tokens, bad magic, malformed stack, extra bytes, …) → diagnostic + exit `1`, **no output file**. Lex errors on `tokenize` still dump valid tokens then fail. `parse` / `compile` stop before writing on lex/parse/format errors.
+
+## Diagnostics
+
+Every warning and error is emitted via `Eml.Diagnostics` as:
+
+```
+[00001] line:column description
+```
+
+Optionally append ` (from $VARNAME)` when the location comes from substituted text. CLI / I/O diagnostics with no source location use `0:0`. BEML diagnostics use line `1` and a 1-based byte offset as column. Color: red for errors, yellow for warnings; `--no-color` disables. CLI errors still print usage + `Try 'eml help'…` after the diagnostic line(s).
 
 ## `help`
 
@@ -29,13 +73,12 @@ eml help
 eml help preproc
 eml help tokenize
 eml help parse
+eml help compile
 ```
 
-- `eml help` — usage, command list, and common options on stdout; exit `0`
-- `eml help preproc` — preproc-specific usage on stdout; exit `0`
-- `eml help tokenize` — tokenize-specific usage on stdout; exit `0`
-- `eml help parse` — parse-specific usage on stdout; exit `0`
-- Unknown topic → stderr error + usage, exit `1`
+- `eml help` — usage, command list, input formats, and common options on stdout; exit `0`
+- `eml help <command>` — command-specific usage on stdout; exit `0`
+- Unknown topic → stderr diagnostic + usage, exit `1`
 - Banner is still printed unless `--no-logo` is set
 
 ## Startup banner
@@ -52,38 +95,41 @@ With `--output`/`-o`, the banner still goes to stdout while command output goes 
 
 ## `preproc`
 
-Substitute `$VARNAME` from `--var` bindings and write expanded `.teml` text.
+Substitute `$VARNAME` from `--var` bindings and write expanded **mxeml** or **teml** text.
 
 ```
-eml preproc --input|-i <file.teml> [--output|-o <file.teml>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
+eml preproc [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--output-format|-of mxeml|teml] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
 ```
 
-- `--input` / `-i` — required; must end in `.teml`
-- `--output` / `-o` — optional; if present must end in `.teml`; if omitted, output goes to stdout
+- Effective input must be `mxeml` or `teml`
+- `--output-format` / `-of` — optional; `mxeml` or `teml`; **default = effective input format**. Must match the input format (cannot preproc mxeml to teml or the reverse)
+- `--output` / `-o` — optional; if present must end in `.mxeml` or `.teml` matching `-of`; if omitted, output goes to stdout
 - Unbound `$VARNAME` — error for **every** occurrence; no output; exit `1`
 - Unused `--var` — warning (or error with `--warn error`)
-- No `$VAR` in file — output equals input (after `Read_File` newline normalization)
+- No `$VAR` in file — output equals input (after newline normalization)
 
 Examples:
 
 ```
-eml preproc -i filename.teml
-eml preproc -i filename.teml -o other.teml
-eml preproc -i f.teml -v '$X=1+2'
-eml --no-logo preproc -i f.teml -v '$X=1' -w none
+eml preproc -i f.mxeml -v '$X=1+2'
+eml preproc -i f.teml -o out.teml
+eml --no-logo preproc -if mxeml < in.mxeml
+eml --no-logo preproc -i f.mxeml -v '$X=1' -w none
 ```
 
 ## `tokenize`
 
-Run preprocessor, then dump the token stream. Input is required; output is optional.
+Optionally preprocess (mxeml/teml), then dump the token stream. Input is optional (stdin); output is optional.
 
 ```
-eml tokenize --input|-i <file.teml> [--output|-o <file.tokens>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
+eml tokenize [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file.tokens>] [--output-format|-of tokens] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
 ```
 
-- `--input` / `-i` — required; must end in `.teml` (this stage; `.eml` tokenize comes later)
+- Effective input must be `mxeml`, `teml`, or `eml` (not `beml`)
+- `--output-format` / `-of` — optional; only `tokens` (default `tokens`)
 - `--output` / `-o` — optional; if present must end in `.tokens`; if omitted, the dump goes to stdout
 - Flag order after `tokenize` is free; space-separated only (no `--input=`)
+- On `eml` input, preprocessor is off; unused `--var` warns (or errors with `--warn error`)
 
 ### `.tokens` dump format
 
@@ -94,7 +140,7 @@ One token per line, no header, no EOF token, no skipped whitespace:
 ```
 
 `line` and `column` are 1-based **original** source positions. Around each run
-of tokens from the same substitution occurrence, the dump inserts comment lines
+of tokens from the same substitution occurrence (mxeml/teml), the dump inserts comment lines
 (not tokens):
 
 ```
@@ -107,11 +153,11 @@ Invalid tokens are not written to the dump.
 
 ### Errors and exit codes
 
-- Invalid CLI → short error + usage on stderr (red unless `--no-color`), plus a hint to try `eml help`, exit `1`
-- Missing command → `error: missing command (expected help, preproc, tokenize, or parse); got '…'` (or without `; got …` when no args), exit `1`
-- Preprocess unbound `$VAR` → `error: undefined variable $X at line N, column M` (all occurrences); no dump; exit `1`
-- Unused `--var` → `warning: unused variable $Y` (yellow) or `error: unused variable $Y` with `--warn error`; exit `1` only in error mode
-- Lex errors → `error: invalid token at line N, column M: …` optionally `(from $VAR)`; continue scanning; still emit valid tokens; exit `1`
+- Invalid CLI → diagnostic `[ID] 0:0 …` + usage on stderr (red unless `--no-color`), plus a hint to try `eml help`, exit `1`
+- Missing command → diagnostic for missing/unknown command, exit `1`
+- Preprocess unbound `$VAR` → diagnostic per occurrence; no dump; exit `1`
+- Unused `--var` → unused-variable warning or error; exit `1` only in `--warn error` mode
+- Lex errors → diagnostic per bad token, optionally `(from $VAR)`; continue scanning; still emit valid tokens; exit `1`
 - I/O failure → stderr diagnostic, exit `1`
 - Success → exit `0`
 
@@ -121,35 +167,36 @@ Usage text (errors):
 Usage:
   eml <command> [options]
   eml help [command]
-  eml preproc --input|-i <file.teml> [--output|-o <file.teml>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
-  eml tokenize --input|-i <file.teml> [--output|-o <file.tokens>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
-  eml parse --input|-i <file.teml> [--output|-o <file>] [--output-format|-of mermaid|md|dot|svg] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
+  eml preproc [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo] [--output-format|-of mxeml|teml]
+  eml tokenize [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo] [--output-format|-of tokens]
+  eml parse [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo] [--output-format|-of mermaid|md|dot|svg]
+  eml compile [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo] [--output-format|-of eml|beml]
 Try 'eml help' for more information.
 ```
 
 Examples:
 
 ```
-eml tokenize --input filename.teml --output other.tokens
-eml tokenize -i filename.teml -v '$X=1'
-eml tokenize --no-logo -i filename.teml -o other.tokens
+eml tokenize -i filename.mxeml
+eml tokenize -i f.eml -o other.tokens
+eml tokenize -if teml < in.teml
+eml --no-logo tokenize -if eml < prog.eml
 ```
-
-`.eml` tokenize is not implemented yet; treating a `.eml` input as tokenize is invalid CLI for now.
 
 ## `parse`
 
-Preprocess a `.teml` file, tokenize, then build a syntax tree with standard mathematical operator precedence and parentheses. Dump the tree.
+Build a tree and dump it. **mxeml** dumps the expression AST; **teml** / **eml** / **beml** dump the IR EML tree.
 
 ```
-eml parse --input|-i <file.teml> [--output|-o <file>] [--output-format|-of mermaid|md|dot|svg] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
+eml parse [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--output-format|-of mermaid|md|dot|svg] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
 ```
 
-- `--input` / `-i` — required; must end in `.teml` (this stage; `.eml` parse comes later)
+- Effective input may be any of the four formats
 - `--output` / `-o` — optional; if omitted, the dump goes to stdout
 - `--output-format` / `-of` — optional; default `mermaid`. Values: `mermaid`, `md`, `dot`, `svg`
 - Flag order after `parse` is free; space-separated only (no `--input=` / `--output-format=`)
 - Parse `-of` / `--output-format` as their own flags so `-of` is never treated as `-o`
+- On mxeml/teml: preprocess first. On eml/beml: no preprocess; unused `--var` warns/errors per `--warn`
 
 ### Output format vs extension
 
@@ -164,78 +211,91 @@ When `-o` is present, the extension **must match** the selected format:
 
 Mismatch is invalid CLI. Without `-o`, the same format is written to stdout.
 
-Pipeline: read file → preprocess → if unbound or `--warn error` unused, report and stop → tokenize → if lex errors, report and stop (no tree) → parse → if parse error, report and stop (no tree) → emit.
+Pipeline (by format):
 
-Parse errors stop at the first error:
+- **mxeml** — read → preprocess → tokenize → parse AST → dump AST
+- **teml** — read → preprocess → teml tokenize → teml parse → IR dump
+- **eml** — read → eml tokenize → eml parse → IR dump
+- **beml** — read bytes → beml reader → unflatten → IR dump
 
-```
-error: parse error at line <line>, column <column>: <reason>
-```
-
-Optionally append `(from $VARNAME)` when the error location comes from substituted text.
+Stop with no tree on unbound/`--warn error`, lex, or parse errors. Parse errors stop at the first error (diagnostic via `Eml.Diagnostics`).
 
 Exit `0` on success; `1` on invalid CLI, I/O, preprocess, lex, or parse errors.
 
 `eml help parse` — parse-specific usage on stdout; exit `0`.
 
-`.eml` parse is not implemented yet; treating a `.eml` input as parse is invalid CLI for now.
-
 Examples:
 
 ```
-eml parse -i filename.teml
-eml parse -i filename.teml -o other.syntaxtree
-eml parse -i filename.teml -o other.md -of md
-eml parse -i f.teml -v '$X=1' -w none
-eml parse --no-logo -i filename.teml -of svg -o other.svg
+eml parse -i filename.mxeml
+eml parse -i f.teml -of md -o other.md
+eml parse -if beml -i prog.beml
+eml parse -i filename.mxeml -o other.syntaxtree
+eml parse --no-logo -i filename.mxeml -of svg -o other.svg
 ```
 
 ## `compile`
 
-Lower a `.teml` syntax tree to stack-machine IR and write textual `.eml` or binary `.beml`.
+Lower / reconstruct to IR EML and write textual `.eml` or binary `.beml`.
 
 ```
-eml compile --input|-i <file.teml> [--output|-o <file>] [--format|-f eml|beml] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
+eml compile [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--output-format|-of eml|beml] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
 ```
 
-- `-i` / `--input` — required; must end in `.teml`
-- `-o` / `--output` — optional; extension must match `--format` (default `beml` → `.beml`); omit → stdout
-- `--format` / `-f` — optional; default `beml`; values `eml` or `beml`. Valid on **`compile` only** (`--format` on preproc/tokenize/parse is invalid CLI). `-of` / `--output-format` stay parse-only and are invalid on `compile`.
-- `--var` / `--warn` / `--no-color` / `--no-logo` — same as parse
-- Flag order free; space-separated only (no `--format=`)
-- Repeated `--format` is invalid CLI
+- Effective input may be any of the four formats
+- `-o` / `--output` — optional; extension must match `--output-format` (default `beml` → `.beml`); omit → stdout
+- `--output-format` / `-of` — optional; default `beml`; values `eml` or `beml`
+- `--var` / `--warn` / `--no-color` / `--no-logo` — same shared rules
+- Flag order free; space-separated only (no `--output-format=`)
+- Repeated `--output-format` is invalid CLI
 - `eml help compile` → usage on stdout, exit `0`
-- Unknown `--format` values (including future `cli`, `bytecode`, `binary`) are invalid CLI
-- Exit `0` on success; `1` on invalid CLI, I/O, preprocess, lex, or parse errors
+- Unknown `-of` values (including future `cli`, `bytecode`, `binary`) are invalid CLI
+- Exit `0` on success; `1` on invalid CLI, I/O, preprocess, lex, parse, or same-format errors
+
+### Same-format compile (rejected)
+
+- effective input `eml` and `-of eml` → error, stop, no output
+- effective input `beml` and `-of beml` → error, stop, no output (including default `-of beml` on a `.beml` input)
+- `mxeml` / `teml` → either compile output is allowed
+- `eml` → `beml` and `beml` → `eml` are conversions
 
 Output extension must match format:
 
-| `-f` | `-o` extension |
+| `-of` | `-o` extension |
 |---|---|
 | `beml` (default) | `.beml` |
 | `eml` | `.eml` |
 
-Pipeline: read file → preprocess → tokenize → parse → lower AST to IR tree → encode as `eml` or `beml`. Stop with no output file on unbound/`--warn error`, lex, or parse errors (same gates as parse).
+Pipeline (by format):
+
+- **mxeml** — preprocess → tokenize → parse AST → lower to IR → encode
+- **teml** — preprocess → teml tokenize/parse → IR → encode
+- **eml** — eml tokenize/parse → IR → encode (as beml only, given same-format rule)
+- **beml** — beml reader / unflatten → IR → encode (as eml only, given same-format rule)
+
+Stop with no output file on unbound/`--warn error`, lex, parse, or same-format errors.
 
 Examples:
 
 ```
-eml compile -i filename.teml
-eml compile -i filename.teml -o other.beml
-eml compile -i filename.teml -o other.eml -f eml
-eml compile --no-logo -i f.teml -f eml
-eml compile -i f.teml -v '$X=1' -w none -o out.beml
+eml compile -i filename.mxeml -o other.beml
+eml compile -i f.eml -of beml -o out.beml
+eml compile -i filename.mxeml -o other.eml -of eml
+eml --no-logo compile -if mxeml < in.mxeml -of eml
+eml compile -i f.mxeml -v '$X=1' -w none -o out.beml
 ```
 
-Native / .NET / JVM backends (`--format cli`, `bytecode`, `binary`) are not implemented yet.
+Native / .NET / JVM backends (`-of cli`, `bytecode`, `binary`) are not implemented yet.
 
 ## `run`
 
 Interpret. Bind variables as extra arguments `$NAME:VALUE`. `VALUE` is a source constant (decimal, scientific, `i`, `e`, `pi`, `phi`, …).
 
 ```
+eml run --input filename.mxeml $VAR1:1.345 $VAR2:i $VAR3:e $VAR4:99
 eml run --input filename.teml $VAR1:1.345 $VAR2:i $VAR3:e $VAR4:99
 eml run --input filename.eml $VAR1:1.345 $VAR2:i $VAR3:e $VAR4:99
+eml run --input filename.beml $VAR1:1.345 $VAR2:i $VAR3:e $VAR4:99
 ```
 
 Do not invent extra subcommands or flags beyond this surface unless the user asks.

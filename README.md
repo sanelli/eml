@@ -27,107 +27,95 @@ This produces:
 Compiler switches treat **warnings as errors** and enable full style and
 runtime checks (see `alire.toml` `[build-switches]` and `.cursor/rules/eml-build.mdc`).
 
+## Input formats
+
+| Format | Extension | Role |
+|--------|-----------|------|
+| `mxeml` | `.mxeml` | Math expression language (operators, functions, `eml(x, y)`) |
+| `teml` | `.teml` | Nested tree text: `1` and `eml(S, S)` only |
+| `eml` | `.eml` | Textual stack IR (`ONE` / `EML`) |
+| `beml` | `.beml` | Binary packed-bit stack IR |
+
+`--input` / `-i` is optional (stdin when omitted). If `-i` is omitted,
+`--input-format` / `-if` is required. When both are present, `-if` overrides
+the file extension.
+
+Diagnostics print as `[ID] line:column description` (five-digit IDs).
+
 ## Run
 
 ```powershell
 alr run
 # or
-./bin/eml --no-logo preproc -i path/to/file.teml
-./bin/eml --no-logo tokenize -i path/to/file.teml
-./bin/eml --no-logo parse -i path/to/file.teml
-./bin/eml --no-logo compile -i path/to/file.teml
+./bin/eml --no-logo preproc -i path/to/file.mxeml
+./bin/eml --no-logo tokenize -i path/to/file.mxeml
+./bin/eml --no-logo parse -i path/to/file.mxeml
+./bin/eml --no-logo compile -i path/to/file.mxeml
+./bin/eml --no-logo compile -if mxeml -of eml   # stdin math → textual .eml
 ```
 
 ### Preproc
 
-Substitute `$VARNAME` placeholders before tokenization:
+Substitute `$VARNAME` placeholders (`.mxeml` and `.teml` only):
 
 ```powershell
-./bin/eml preproc -i filename.teml
-./bin/eml preproc -i filename.teml -o other.teml
-./bin/eml preproc -i f.teml -v '$X=1+2'
-./bin/eml --no-logo preproc -i f.teml -v '$X=1' -w none
+./bin/eml preproc -i filename.mxeml
+./bin/eml preproc -i filename.mxeml -o other.mxeml
+./bin/eml preproc -i f.mxeml -v '$X=1+2'
+./bin/eml --no-logo preproc -i f.mxeml -v '$X=1' -w none
 ```
 
-- `-i` / `--input` — required `.teml` file
-- `-o` / `--output` — optional `.teml` output; stdout if omitted
-- `-v` / `--var $NAME=EXPR` — bind a variable (repeatable; quote in PowerShell)
-- `-w` / `--warn` — `default` (default), `none`, or `error` for unused `--var`
-- `--no-logo` / `--no-color` — same as other commands
-
-Unbound `$VARNAME` in the file is an error (all occurrences reported). Exit `0`
-on success, `1` on failure.
+- `-i` / `--input` — optional; extension `.mxeml` or `.teml` (or `-if`)
+- `-o` / `--output` — optional; extension must match input format
+- `-of` / `--output-format` — `mxeml` or `teml` (default = input format)
+- `-v` / `--var $NAME=EXPR` — bind a variable (repeatable)
+- `-w` / `--warn` — `default`, `none`, or `error` for unused `--var`
 
 ### Tokenize
 
 ```powershell
-./bin/eml tokenize -i filename.teml
-./bin/eml tokenize -i filename.teml -o other.tokens
-./bin/eml tokenize -i f.teml -v '$X=1' -w none
-./bin/eml --no-logo tokenize -i filename.teml -o other.tokens
+./bin/eml tokenize -i filename.mxeml
+./bin/eml tokenize -i filename.mxeml -o other.tokens
+./bin/eml tokenize -i f.eml
+./bin/eml --no-logo tokenize -i filename.mxeml -o other.tokens
 ```
 
-- `-i` / `--input` — required `.teml` file
-- `-o` / `--output` — optional `.tokens` file; omit to write tokens to stdout
-- `-v` / `--var` — preprocessor bindings (repeatable)
-- `-w` / `--warn` — unused `--var` warning mode
-- `--no-logo` — suppress the stdout banner (use for pure dumps / pipes)
-- `--no-color` — plain stderr diagnostics (no ANSI color)
-
-The preprocessor runs first. Token dumps use original source line/column and
-mark substituted spans with `-- $NAME begin` / `-- $NAME end` comment lines.
-
-Invalid tokens are reported on stderr; scanning continues and valid tokens are
-still emitted. Exit status is `0` on success and `1` on CLI, I/O, preprocess,
-or lex errors.
+Accepts `mxeml`, `teml`, and `eml` (not `beml`). `-of tokens` is the only
+output format (default).
 
 ### Parse
 
 ```powershell
-./bin/eml parse -i filename.teml
-./bin/eml parse -i filename.teml -o other.syntaxtree
-./bin/eml parse -i filename.teml -of md -o other.md
-./bin/eml parse -i f.teml -v '$X=1' -w none
-./bin/eml --no-logo parse -i filename.teml
+./bin/eml parse -i filename.mxeml
+./bin/eml parse -i filename.mxeml -o other.syntaxtree
+./bin/eml parse -i filename.mxeml -of md -o other.md
+./bin/eml parse -i tree.teml
+./bin/eml parse -i stack.eml -of svg -o t.svg
 ```
 
-- `-i` / `--input` — required `.teml` file
-- `-o` / `--output` — optional dump file; omit to write to stdout
-- `-of` / `--output-format` — `mermaid` (default), `md`, `dot`, or `svg`
-- `-v` / `--var` — preprocessor bindings (repeatable)
-- `-w` / `--warn` — unused `--var` warning mode
-- Output extension must match the format (`.syntaxtree`, `.md`, `.dot`, `.svg`)
-
-The preprocessor runs first, then tokenize and parse. Lex or parse errors are
-reported on stderr with original line/column; substituted text adds
-`(from $NAME)` when applicable. No tree is written on failure. Exit status is
-`0` on success and `1` on CLI, I/O, preprocess, lex, or parse errors.
+Accepts all four input formats. `-of` / `--output-format`: `mermaid` (default),
+`md`, `dot`, or `svg`. Output extension must match.
 
 ### Compile
 
-Lower a `.teml` file to stack-machine IR (`.beml` binary by default, or textual `.eml`):
+Lower to stack-machine IR (`.beml` binary by default, or textual `.eml`):
 
 ```powershell
-./bin/eml compile -i filename.teml
-./bin/eml compile -i filename.teml -o other.beml
-./bin/eml compile -i filename.teml -o other.eml -f eml
-./bin/eml compile -i f.teml -v '$X=1' -w none -o out.beml
-./bin/eml --no-logo compile -i f.teml -f eml
+./bin/eml compile -i filename.mxeml
+./bin/eml compile -i filename.mxeml -o other.beml
+./bin/eml compile -i filename.mxeml -o other.eml -of eml
+./bin/eml compile -i f.teml -of beml
+./bin/eml compile -i stack.eml -of beml
+./bin/eml --no-logo compile -i f.mxeml -of eml
 ```
 
-- `-i` / `--input` — required `.teml` file
-- `-o` / `--output` — optional; extension must match format (`.beml` default, `.eml` with `-f eml`); stdout if omitted
-- `-f` / `--format` — `beml` (default) or `eml`
-- `-v` / `--var` — preprocessor bindings (repeatable)
-- `-w` / `--warn` — unused `--var` warning mode
-- `--no-logo` — required when piping binary `.beml` to stdout
-
-The preprocessor runs first, then tokenize, parse, and IR lowering. Exit status is
-`0` on success and `1` on CLI, I/O, preprocess, lex, or parse errors.
+- `-of` / `--output-format` — `beml` (default) or `eml` (replaces old `-f` / `--format`)
+- Same-format compile is an error (`eml`→`eml`, `beml`→`beml`)
+- `--format` / `-f` is rejected; use `-of`
 
 ## EML file formats
 
-### Textual `.eml` (`--format eml`)
+### Textual `.eml` (`--output-format eml`)
 
 Human-readable stack-machine IR.
 
@@ -138,7 +126,7 @@ Human-readable stack-machine IR.
 Example for source constant `e`:
 
 ```
--- Source: e.teml
+-- Source: e.mxeml
 -- Compiler: eml
 -- Version: 0.1.0-dev
 -- Date: 2026-08-22 09:00:00 UTC
@@ -147,7 +135,17 @@ ONE
 EML  -- e
 ```
 
-### Binary `.beml` (`--format beml`, default)
+### Nested `.teml`
+
+Paper tree grammar only:
+
+```
+1
+eml(1, 1)
+eml(eml(1, 1), 1)
+```
+
+### Binary `.beml` (`--output-format beml`, default)
 
 Compact packed-bit encoding of the same instruction stream (no comments, no source path).
 
@@ -166,8 +164,12 @@ Example: `ONE`, `ONE`, `EML` → count `3`, one code byte `11000000` (binary).
 
 ## Samples
 
-`.teml` examples live under [`samples/`](samples/), including precedence stress
-cases (`16_`–`25_`) and parameterized expressions using `$VARNAME`. Run them with:
+`.mxeml` examples live under [`samples/`](samples/), including precedence stress
+cases (`16_`–`25_`) and parameterized expressions using `$VARNAME`. Nested
+`.teml` samples (`t01_`…) cover the tree-text format. `run_samples.ps1`
+exercises every input format each command supports: `.teml` samples for
+preproc/tokenize/parse/compile, and stack `.eml` / `.beml` derived by compiling
+non-taylor samples into `.results/_chain/` then piping into tokenize/parse/compile.
 
 ```powershell
 ./scripts/run_samples.ps1
@@ -185,7 +187,7 @@ cases (`16_`–`25_`) and parameterized expressions using `$VARNAME`. Run them w
 The script passes dummy `--var` bindings for sample variable names and
 `--warn none`. Outputs go to `.results/<operation>/` (gitignored). For `parse`,
 each sample is emitted in all four formats. For `compile`, each sample writes
-default `.beml` and `-f eml` `.eml`. Exit `1` if any sample fails.
+default `.beml` and `-of eml` `.eml`. Exit `1` if any sample fails.
 
 ## Test
 
@@ -195,9 +197,8 @@ alr run -- eml_tests
 ./bin/eml_tests
 ```
 
-Coverage includes regex automata, preprocessor, `.teml` tokenization, expression
-parsing (precedence and errors), tree emitters, IR lowering, and `eml preproc` / `eml tokenize`
-/ `eml parse` / `eml compile` CLI happy/negative paths.
+Coverage includes regex automata, preprocessor, mxeml/teml/eml tokenization,
+parsers, IR lowering, BEML reader, and CLI happy/negative paths.
 
 ## Layout
 
@@ -206,16 +207,21 @@ parsing (precedence and errors), tree emitters, IR lowering, and `eml preproc` /
 | `src/eml.ads` | Root `Eml` package |
 | `src/eml-main.adb` | Main procedure (`Eml.Main` → binary `eml`) |
 | `src/eml-cli.*` | CLI (`preproc`, `tokenize`, `parse`, `compile`, banner, flags) |
+| `src/eml-diagnostics.*` | Diagnostic ID catalog and formatting |
 | `src/eml-info.*` | Program name / author / version / commit |
 | `src/regex_automata.*` | In-repo regex → NFA library |
-| `src/expr_preprocessor.*` | `.teml` `$VARNAME` substitution |
-| `src/expr_tokenizer.*` | `.teml` tokenizer |
-| `src/expr_parser.*` | `.teml` parser and tree emitters |
-| `src/expr_lower.*` | `.teml` AST → IR EML lowering |
-| `src/eml_tokenizer.*` | `.eml` tokenizer stub |
-| `src/eml_parser.*` | `.eml` parser stub |
-| `src/ir_eml.*` | Shared IR EML tree and `.eml`/`.beml` encoders |
+| `src/expr_preprocessor.*` | `$VARNAME` substitution for mxeml/teml |
+| `src/expr_tokenizer.*` | `.mxeml` tokenizer |
+| `src/expr_parser.*` | `.mxeml` parser and tree emitters |
+| `src/expr_lower.*` | `.mxeml` AST → IR EML lowering |
+| `src/teml_tokenizer.*` | Nested `.teml` tokenizer |
+| `src/teml_parser.*` | Nested `.teml` → IR |
+| `src/eml_tokenizer.*` | Stack `.eml` tokenizer |
+| `src/eml_parser.*` | Stack `.eml` → IR |
+| `src/beml_reader.*` | `.beml` binary reader |
+| `src/beml_parser.*` | BEML opcodes → IR |
+| `src/ir_eml.*` | Shared IR EML tree, encoders, and tree dumps |
 | `src/interpreter.*` | Interpreter stub |
-| `tests/` | Regex, preprocessor, tokenizer, parser, and CLI tests |
+| `tests/` | Unit and CLI tests |
 | `scripts/embed_git_commit.ps1` | Pre-build short-hash embed |
 | `scripts/run_samples.ps1` | Batch preproc / tokenize / parse / compile samples |

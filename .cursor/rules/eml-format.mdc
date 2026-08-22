@@ -15,15 +15,17 @@ eml(x, y) = exp(x) - ln(y)
 
 Paired with the constant `1` (`ln(1) = 0`), this generates the scientific-calculator basis (arithmetic, elementary functions, and constants such as `e`, `pi`, `i`).
 
-## Textual grammar
+## Nested tree text (`.teml`)
 
-Closed programs are a binary tree of `eml` and `1`. Parameterized programs also allow `$VARNAME` leaves (bound by `eml run`):
+Closed programs are a binary tree of `eml` and `1`. Parameterized programs also allow `$VARNAME` as **preprocessor** paste sites (bound by `--var` on `preproc` / `tokenize` / `parse` / `compile`; not IR leaves after a successful preprocess):
 
 ```
-S → 1 | $VARNAME | eml(S, S)
+S → 1 | eml(S, S)
 ```
 
-A `.eml` file is EML text. Without variables it contains only `eml(...)` and `1`.
+A `.teml` file contains only nested `1` and `eml(...)` (whitespace allowed). No numbers other than `1`, no math operators, no stack opcodes `ONE`/`EML`.
+
+Paper-style `$VARNAME` leaves inside IR remain out of scope: after preprocess, IR is still only `1` and `eml(S, S)`.
 
 ## Stack-machine IR (`eml compile`)
 
@@ -32,9 +34,9 @@ In-memory IR is a binary tree of `1` and `eml(S, S)` only. The compiler emits a 
 - `ONE` — push constant `1`
 - `EML` — pop `Y`, then `X`; push `eml(X, Y) = exp(X) - ln(Y)`
 
-Well-formed programs satisfy `#ONE = #EML + 1` with no stack underflow.
+Well-formed programs satisfy `#ONE = #EML + 1` with no stack underflow. `IR_Eml.Flatten` / `Unflatten` convert between the tree and this stream.
 
-### Textual `.eml` (`--format eml`)
+### Textual `.eml` (`eml compile -of eml`)
 
 Header comments (UTC `Date`), then one instruction per line:
 
@@ -47,11 +49,13 @@ ONE
 EML  -- <rewrite tag>
 ```
 
-`ONE` lines have no trailing comment; only `EML` lines carry an optional `-- <tag>` naming the rewrite.
+`ONE` lines have no trailing comment; only `EML` lines carry an optional `-- <tag>` naming the rewrite. Header comments are optional on input (they are comments). Stack `.eml` is **not** nested `eml(...)` tree text.
 
-### Binary `.beml` (`--format beml`, default)
+### Binary `.beml` (`eml compile -of beml`, default)
 
-Compact packed-bit encoding of the same stream (no comments, no source path). **Multi-byte integer fields are big-endian** (network byte order): 2-byte UTC year, 4-byte instruction count. Layout: magic `BEML`, version `1`, UTC date/time fields, instruction count, then code bits (`1` = `ONE`, `0` = `EML`, MSB-first per byte; pad low bits of last byte with `0`; count is authoritative).
+Compact packed-bit encoding of the same stream (no comments, no source path). **Multi-byte integer fields are big-endian** (network byte order): 2-byte UTC year, 4-byte instruction count. Layout: magic `BEML`, version `1`, UTC date/time fields, instruction count, then code bits (`1` = `ONE`, `0` = `EML`, MSB-first per byte; pad low bits of last byte with `0`; count is authoritative). Read via `Beml_Reader`; reconstruct the tree with `IR_Eml.Unflatten`.
+
+Same-format compile is rejected: `.eml` → `-of eml` and `.beml` → `-of beml` are errors. Cross conversion (`.eml` ↔ `.beml`) is allowed.
 
 ## Identities (from the paper; write `eml`, matching the paper)
 

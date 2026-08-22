@@ -3,6 +3,7 @@ with Ada.Text_IO;
 package body Expr_Parser is
 
    use Ada.Strings.Unbounded;
+   use Eml.Diagnostics;
    use type Expr_Tokenizer.Token_Kind;
 
    function Name return String is
@@ -49,23 +50,33 @@ package body Expr_Parser is
       Pos    : Natural := Tokens'First;
       Result : Parse_Result;
 
-      procedure Fail_At (Line, Col : Positive; Msg : String) is
+      procedure Fail_At
+        (Line, Col : Positive;
+         Id : Diagnostic_Id;
+         Param1 : String := "")
+      is
       begin
          Result.Had_Error := True;
+         Result.Error_Id := Id;
          Result.Error_Line := Line;
          Result.Error_Col := Col;
-         Result.Message := To_Unbounded_String (Msg);
+         Result.Param1 := To_Unbounded_String (Param1);
          Result.From_Var := False;
          Result.Var_Name := Null_Unbounded_String;
          Result.Root := null;
       end Fail_At;
 
-      procedure Fail_Tok (T : Expr_Tokenizer.Token; Msg : String) is
+      procedure Fail_Tok
+        (T : Expr_Tokenizer.Token;
+         Id : Diagnostic_Id;
+         Param1 : String := "")
+      is
       begin
          Result.Had_Error := True;
+         Result.Error_Id := Id;
          Result.Error_Line := T.Line;
          Result.Error_Col := T.Column;
-         Result.Message := To_Unbounded_String (Msg);
+         Result.Param1 := To_Unbounded_String (Param1);
          Result.From_Var := T.From_Var;
          Result.Var_Name := T.Var_Name;
          Result.Root := null;
@@ -155,6 +166,22 @@ package body Expr_Parser is
          return N;
       end Make_Call;
 
+      function Make_Eml_Call
+        (T     : Expr_Tokenizer.Token;
+         Left  : Node_Access;
+         Right : Node_Access) return Node_Access
+      is
+         N : constant Node_Access := new Node;
+      begin
+         N.Kind := Call_Node;
+         N.Lexeme := T.Lexeme;
+         N.Line := T.Line;
+         N.Column := T.Column;
+         N.Left := Left;
+         N.Right := Right;
+         return N;
+      end Make_Eml_Call;
+
       --  Precedence levels (higher binds tighter):
       --  1 = add/sub, 2 = mul/div, 3 = power
       --  Unary prefix uses Min_Bp = 3 so power binds tighter than unary.
@@ -202,7 +229,7 @@ package body Expr_Parser is
       function Parse_Primary return Node_Access is
       begin
          if At_End then
-            Fail_Tok (Last_Token, "unexpected end of input");
+            Fail_Tok (Last_Token, MX_Unexpected_EOI);
             return null;
          end if;
 
@@ -249,11 +276,11 @@ package body Expr_Parser is
                         return null;
                      end if;
                      if At_End then
-                        Fail_Tok (T, "expected ')'");
+                        Fail_Tok (T, MX_Expected_RParen);
                         return null;
                      end if;
                      if Peek.Kind /= Expr_Tokenizer.RParen then
-                        Fail_Tok (Peek, "expected ')'");
+                        Fail_Tok (Peek, MX_Expected_RParen);
                         return null;
                      end if;
                      Advance;
@@ -265,22 +292,61 @@ package body Expr_Parser is
                   if At_End then
                      Fail_Tok
                        (T,
-                        "expected '(' after function '"
-                        & To_String (T.Lexeme)
-                        & "'");
+                        MX_Expected_LParen_After_Func,
+                        To_String (T.Lexeme));
                      return null;
                   end if;
                   if Peek.Kind /= Expr_Tokenizer.LParen then
                      Fail_Tok
                        (Peek,
-                        "expected '(' after function '"
-                        & To_String (T.Lexeme)
-                        & "'");
+                        MX_Expected_LParen_After_Func,
+                        To_String (T.Lexeme));
                      return null;
                   end if;
-                  Advance;  --  (
+                  Advance;
+                  if To_String (T.Lexeme) = "eml" then
+                     if not At_End
+                       and then Peek.Kind = Expr_Tokenizer.RParen
+                     then
+                        Fail_Tok (Peek, MX_Unexpected_RParen);
+                        return null;
+                     end if;
+                     declare
+                        Left : constant Node_Access := Parse_Expr (0);
+                     begin
+                        if Result.Had_Error then
+                           return null;
+                        end if;
+                        if At_End
+                          or else Peek.Kind /= Expr_Tokenizer.Comma
+                        then
+                           Fail_Tok
+                             ((if At_End then T else Peek),
+                              MX_Expected_Comma);
+                           return null;
+                        end if;
+                        Advance;
+                        declare
+                           Right : constant Node_Access := Parse_Expr (0);
+                        begin
+                           if Result.Had_Error then
+                              return null;
+                           end if;
+                           if At_End then
+                              Fail_Tok (T, MX_Expected_RParen);
+                              return null;
+                           end if;
+                           if Peek.Kind /= Expr_Tokenizer.RParen then
+                              Fail_Tok (Peek, MX_Expected_RParen);
+                              return null;
+                           end if;
+                           Advance;
+                           return Make_Eml_Call (T, Left, Right);
+                        end;
+                     end;
+                  end if;
                   if not At_End and then Peek.Kind = Expr_Tokenizer.RParen then
-                     Fail_Tok (Peek, "unexpected token ')'");
+                     Fail_Tok (Peek, MX_Unexpected_RParen);
                      return null;
                   end if;
                   declare
@@ -290,11 +356,11 @@ package body Expr_Parser is
                         return null;
                      end if;
                      if At_End then
-                        Fail_Tok (T, "expected ')'");
+                        Fail_Tok (T, MX_Expected_RParen);
                         return null;
                      end if;
                      if Peek.Kind /= Expr_Tokenizer.RParen then
-                        Fail_Tok (Peek, "expected ')'");
+                        Fail_Tok (Peek, MX_Expected_RParen);
                         return null;
                      end if;
                      Advance;
@@ -304,9 +370,8 @@ package body Expr_Parser is
                when others =>
                   Fail_Tok
                     (T,
-                     "unexpected token '"
-                     & To_String (T.Lexeme)
-                     & "'");
+                     MX_Unexpected_Token,
+                     To_String (T.Lexeme));
                   return null;
             end case;
          end;
@@ -352,7 +417,7 @@ package body Expr_Parser is
 
    begin
       if Tokens'Length = 0 then
-         Fail_At (1, 1, "unexpected end of input");
+         Fail_At (1, 1, MX_Unexpected_EOI);
          return Result;
       end if;
 
@@ -362,7 +427,7 @@ package body Expr_Parser is
       end if;
 
       if not At_End then
-         Fail_Tok (Peek, "unexpected token after expression");
+         Fail_Tok (Peek, MX_Unexpected_After_Expr);
          Result.Root := null;
          return Result;
       end if;

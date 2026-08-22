@@ -1,6 +1,7 @@
---  Tokenize .teml source expressions using Regex_Automata.
+--  Tokenize .mxeml source expressions using Regex_Automata.
 with Ada.Strings.Unbounded;
 with Ada.Text_IO;
+with Eml.Diagnostics;
 
 package Expr_Tokenizer is
 
@@ -12,6 +13,7 @@ package Expr_Tokenizer is
       Caret,
       LParen,
       RParen,
+      Comma,
       Number,
       Function_Name,
       Constant_Name);
@@ -41,9 +43,10 @@ package Expr_Tokenizer is
    type Token_Array_Access is access Token_Array;
 
    type Diagnostic is record
+      Id       : Eml.Diagnostics.Diagnostic_Id;
       Line     : Positive := 1;
       Column   : Positive := 1;
-      Message  : Ada.Strings.Unbounded.Unbounded_String;
+      Param1   : Ada.Strings.Unbounded.Unbounded_String;
       From_Var : Boolean := False;
       Var_Name : Ada.Strings.Unbounded.Unbounded_String;
    end record;

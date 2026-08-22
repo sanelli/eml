@@ -3,9 +3,11 @@ description: Source mathematical expression language accepted by the compiler
 alwaysApply: true
 ---
 
-# Source expression language
+# Source expression language (mxeml)
 
-Input is a **textual mathematical expression** in a **`.teml`** file. It must support **parentheses** and standard **operator precedence**. Evaluation is in **C**.
+Input is a **textual mathematical expression** in a **`.mxeml`** file (format `mxeml`). It must support **parentheses** and standard **operator precedence**. Evaluation is in **C**.
+
+Nested tree text (`.teml`) and stack IR (`.eml` / `.beml`) are separate formats; see `eml-format` and `eml-cli`.
 
 ## Operators and functions
 
@@ -13,7 +15,8 @@ Input is a **textual mathematical expression** in a **`.teml`** file. It must su
 |---|---|
 | `+` `-` `*` `/` | arithmetic |
 | `^` | exponentiation |
-| `log` `sin` `cos` `tan` `sqrt` `sinh` `cosh` `tanh` | functions |
+| `log` `sin` `cos` `tan` `sqrt` `sinh` `cosh` `tanh` | functions (one parenthesized argument) |
+| `eml(x, y)` | binary EML operator (exactly two comma-separated expressions) |
 
 ## Operator precedence
 
@@ -21,13 +24,13 @@ Parentheses change structure only (they are not syntax-tree nodes). One expressi
 
 | Level | Forms | Associativity |
 |---|---|---|
-| Primary | number, constant, `(e)`, `func(e)` | n/a |
+| Primary | number, constant, `(e)`, `func(e)`, `eml(e, e)` | n/a |
 | Unary | prefix `+` `-` | right |
 | Power | `^` | right |
 | Mul | `*` `/` | left |
 | Add | `+` `-` | left |
 
-Examples: `1+2*3` is add(1, mul(2, 3)); `2^3^2` is pow(2, pow(3, 2)); `-2^2` is neg(pow(2, 2)). Functions take exactly one parenthesized argument. Implicit multiplication / juxtaposition is not allowed.
+Examples: `1+2*3` is add(1, mul(2, 3)); `2^3^2` is pow(2, pow(3, 2)); `-2^2` is neg(pow(2, 2)). Unary functions take exactly one parenthesized argument. `eml` takes exactly two. Implicit multiplication / juxtaposition is not allowed. Top-level comma and wrong arity (`eml()`, `eml(x)`, `eml(x,y,z)`) are parse errors.
 
 ## Constants
 
@@ -38,7 +41,7 @@ Examples: `1+2*3` is add(1, mul(2, 3)); `2^3^2` is pow(2, pow(3, 2)); `-2^2` is 
 - `e`
 - `phi` (golden ratio)
 
-When lowering to IR (`eml compile`), `log` is **natural log** (`ln`), matching the EML paper. Constant `phi` lowers as `(1 + sqrt(5)) / 2`.
+When lowering to IR (`eml compile`), `log` is **natural log** (`ln`), matching the EML paper. Constant `phi` lowers as `(1 + sqrt(5)) / 2`. Binary `eml(x, y)` lowers to `Make_Eml(Lower(x), Lower(y), Comment => "eml")`.
 
 `$VARNAME` is **preprocessor syntax**, not a tokenizer or parser token. Bindings
 are supplied on the CLI as `--var $NAME=EXPRESSION` (or `-v`) on `preproc`,
@@ -46,7 +49,9 @@ are supplied on the CLI as `--var $NAME=EXPRESSION` (or `-v`) on `preproc`,
 tokenization. Unbound `$VARNAME` in the file is an error (every occurrence
 reported). Unused `--var` bindings emit warnings unless `--warn none`.
 
-After preprocessing, the expression language has no `$VAR` tokens. On future
+Preprocessor also applies to **`.teml`** (nested tree text). On **`.eml`** / **`.beml`**, the preprocessor is off; any `--var` is unused (same warn/error modes).
+
+After preprocessing, the mxeml language has no `$VAR` tokens. On future
 `eml run`, bindings may use a separate `$NAME:VALUE` form (not implemented yet).
 
 ## Out of scope until requested

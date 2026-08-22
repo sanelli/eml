@@ -9,9 +9,9 @@ All backends consume **IR EML** (never the source AST directly).
 
 | Target | Role |
 |---|---|
-| **Stack `.eml`** | Post-order `ONE` / `EML` textual dump with UTC header (`eml compile --format eml`) |
-| **Stack `.beml`** | Packed-bit binary of the same stream (`eml compile --format beml`, default) |
-| **EML tree text** | Pretty-print IR as nested `eml(...)` and `1` (future / other tooling) |
+| **Stack `.eml`** | Post-order `ONE` / `EML` textual dump with UTC header (`eml compile -of eml`) |
+| **Stack `.beml`** | Packed-bit binary of the same stream (`eml compile -of beml`, default) |
+| **EML tree text** | Nested `eml(...)` and `1` (`.teml` input / IR tree dumps; not a compile `-of` yet) |
 | **Native binary** | Lower IR EML through **LLVM** to a machine-code executable |
 | **.NET CLI** | Emit a **.NET CLI DLL/executable**; **may use** .NET math |
 | **Java bytecode** | Emit a **Java class**; **may use** Java math |
@@ -19,7 +19,7 @@ All backends consume **IR EML** (never the source AST directly).
 
 Native LLVM lowering should realize `eml(x, y) = exp(x) - ln(y)` (complex). .NET and Java backends may call the host language’s `exp` / `log` (and other math) instead of expanding everything to a single opcode.
 
-`eml compile --format` currently supports `eml` (textual stack IR) and `beml` (binary stack IR). Future values: `cli` → .NET DLL, `bytecode` → Java, `binary` → LLVM native. See `eml-cli`.
+`eml compile --output-format` / `-of` currently supports `eml` (textual stack IR) and `beml` (binary stack IR). `--format` / `-f` is removed. Future `-of` values: `cli` → .NET DLL, `bytecode` → Java, `binary` → LLVM native. Same-format compile (`eml`→`eml`, `beml`→`beml`) is rejected. See `eml-cli`.
 
 ## Not yet specified
 

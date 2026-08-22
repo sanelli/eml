@@ -39,7 +39,29 @@ package IR_Eml is
    function Flatten (Root : Node_Access) return Opcode_Array_Access;
    --  Post-order ONE/EML sequence. Null root yields empty array.
 
+   function Unflatten (Ops : Opcode_Array) return Node_Access;
+   function Unflatten (Ops : Opcode_Array_Access) return Node_Access;
+   --  Reconstruct tree from post-order opcodes. Null on empty/ill-formed.
+
    function Count_Opcodes (Root : Node_Access) return Natural;
+
+   type Tree_Output_Format is (Mermaid, Markdown, Dot, Svg);
+
+   function Format_Tree_Mermaid (Root : Node_Access) return String;
+   function Format_Tree_Markdown (Root : Node_Access) return String;
+   function Format_Tree_Dot (Root : Node_Access) return String;
+   function Format_Tree_Svg (Root : Node_Access) return String;
+
+   function Format_Tree
+     (Root : Node_Access; Fmt : Tree_Output_Format) return String;
+
+   procedure Write_Tree_To_File
+     (Root : Node_Access;
+      Fmt  : Tree_Output_Format;
+      Path : String);
+
+   procedure Write_Tree_To_Stdout
+     (Root : Node_Access; Fmt : Tree_Output_Format);
 
    function Format_Eml (Root : Node_Access; Meta : Dump_Meta) return String;
 
