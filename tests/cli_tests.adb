@@ -1071,6 +1071,360 @@ package body CLI_Tests is
          Require
            (Status = Ada.Command_Line.Failure, "cli-unknown-cmd: exit");
       end;
+
+      declare
+         Args   : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"), A ("help"), A ("run")];
+         Status : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Success, "cli-help-run: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_run_one.mxeml", "1");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("run"),
+            A ("-i"),
+            A (In_Path)];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Success, "cli-run-mxeml-1: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_run_e.mxeml", "e");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("run"),
+            A ("-i"),
+            A (In_Path)];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Success, "cli-run-mxeml-e: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_run_e.teml", "eml(1, 1)");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("run"),
+            A ("-i"),
+            A (In_Path)];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Success, "cli-run-teml: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_run_one.eml", "ONE");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("run"),
+            A ("-i"),
+            A (In_Path)];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Success, "cli-run-eml-one: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp
+             ("cli_run_e.eml",
+              "ONE" & ASCII.LF & "ONE" & ASCII.LF & "EML");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("run"),
+            A ("-i"),
+            A (In_Path)];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Success, "cli-run-eml-e: exit");
+      end;
+
+      declare
+         In_Path  : constant String :=
+           Write_Temp ("cli_run_beml.mxeml", "1");
+         Beml_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_run_beml.beml");
+         C_Args   : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-o"),
+            A (Beml_Path)];
+         R_Args   : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("run"),
+            A ("-i"),
+            A (Beml_Path)];
+         Status   : Ada.Command_Line.Exit_Status;
+      begin
+         Status := Eml.CLI.Run (C_Args);
+         Require
+           (Status = Ada.Command_Line.Success, "cli-run-beml: compile");
+         Status := Eml.CLI.Run (R_Args);
+         Require
+           (Status = Ada.Command_Line.Success, "cli-run-beml: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_run_var.mxeml", "$X");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("run"),
+            A ("-i"),
+            A (In_Path),
+            A ("-v"),
+            A ("$X=1"),
+            A ("-w"),
+            A ("none")];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Success, "cli-run-mxeml-var: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_run_var.teml", "eml($X, 1)");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("run"),
+            A ("-i"),
+            A (In_Path),
+            A ("-v"),
+            A ("$X=1"),
+            A ("-w"),
+            A ("none")];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Success, "cli-run-teml-var: exit");
+      end;
+
+      declare
+         Args   : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("run"),
+            A ("-if"),
+            A ("mxeml")];
+         Status : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args, "1");
+      begin
+         Require
+           (Status = Ada.Command_Line.Success, "cli-run-stdin: exit");
+      end;
+
+      declare
+         In_Path  : constant String :=
+           Write_Temp ("cli_run_stdin_b.mxeml", "1");
+         Beml_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_run_stdin.beml");
+         C_Args   : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-o"),
+            A (Beml_Path)];
+         R_Args   : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("run"),
+            A ("-if"),
+            A ("beml")];
+         Status   : Ada.Command_Line.Exit_Status;
+         Sz       : Natural;
+      begin
+         Status := Eml.CLI.Run (C_Args);
+         Require
+           (Status = Ada.Command_Line.Success,
+            "cli-run-stdin-beml: compile");
+         Sz := Natural (Ada.Directories.Size (Beml_Path));
+         Status := Eml.CLI.Run (R_Args, Read_Bytes (Beml_Path, Sz));
+         Require
+           (Status = Ada.Command_Line.Success,
+            "cli-run-stdin-beml: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_run_o.mxeml", "1");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("run"),
+            A ("-i"),
+            A (In_Path),
+            A ("-o"),
+            A ("out.txt")];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure, "cli-run-o: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_run_of.mxeml", "1");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("run"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("eml")];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure, "cli-run-of: exit");
+      end;
+
+      declare
+         Args   : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"), A ("--no-color"), A ("run")];
+         Status : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure,
+            "cli-run-missing-if: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_run_lex.mxeml", "1+@2");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("run"),
+            A ("-i"),
+            A (In_Path)];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure, "cli-run-lex: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_run_parse.mxeml", "1+");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("run"),
+            A ("-i"),
+            A (In_Path)];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure, "cli-run-parse: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_run_unbound.mxeml", "$X");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("run"),
+            A ("-i"),
+            A (In_Path)];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure, "cli-run-unbound: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_run_unused.eml", "ONE");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("run"),
+            A ("-i"),
+            A (In_Path),
+            A ("-v"),
+            A ("$X=1"),
+            A ("-w"),
+            A ("error")];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure, "cli-run-unused: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_run_colon.mxeml", "1");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("run"),
+            A ("-i"),
+            A (In_Path),
+            A ("$X:1")];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure, "cli-run-colon: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_run_badext.xyz", "1");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("run"),
+            A ("-i"),
+            A (In_Path)];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure, "cli-run-badext: exit");
+      end;
    end Run;
 
 end CLI_Tests;

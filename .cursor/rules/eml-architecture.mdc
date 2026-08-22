@@ -38,9 +38,12 @@ Tokenizers emit tokens. Parsers emit trees / IR. Do not skip the parse step. Bin
 .mxeml | .teml | .eml → tokenize → .tokens
 .mxeml | .teml | .eml | .beml → parse → .syntaxtree (mermaid/md/dot/svg)
 .mxeml | .teml | .eml | .beml → compile → .eml | .beml   (same-format compile rejected)
+.mxeml | .teml | .eml | .beml → run → stdout compact Complex
 ```
 
-Effective format is `--input-format` / `-if` when set, otherwise the input extension. `tokenize` stops at tokens; `parse` stops at the tree dump (AST for mxeml, IR tree otherwise). Neither requires lowering to backends.
+The README **Pipelines** mermaid is the picture of record for preproc, tokenize, parse, compile, and run. Update that figure in the **same** change whenever those flows or their outputs change. Do not leave the diagram stale.
+
+Effective format is `--input-format` / `-if` when set, otherwise the input extension. `tokenize` stops at tokens; `parse` stops at the tree dump (AST for mxeml, IR tree otherwise). Neither requires lowering to backends. `run` Flattens IR and evaluates on a complex stack.
 
 ## Implementation constraints
 

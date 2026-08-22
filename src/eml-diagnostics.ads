@@ -31,6 +31,8 @@ package Eml.Diagnostics is
    CLI_Same_Format_Compile            : constant Diagnostic_Id := 23;
    CLI_IO_Error                       : constant Diagnostic_Id := 24;
    CLI_Unexpected_Format_Flag         : constant Diagnostic_Id := 25;
+   CLI_Run_Rejects_Output             : constant Diagnostic_Id := 26;
+   CLI_Run_Rejects_Output_Format      : constant Diagnostic_Id := 27;
 
    --  Preprocessor (00100-00199)
    PP_Unbound_Variable                : constant Diagnostic_Id := 100;
@@ -83,6 +85,11 @@ package Eml.Diagnostics is
    BE_Empty_Program                   : constant Diagnostic_Id := 407;
    BE_Stack_Underflow                 : constant Diagnostic_Id := 408;
    BE_Stack_Not_Single                : constant Diagnostic_Id := 409;
+
+   --  Runtime / interpreter (00500-00599)
+   RT_Stack_Underflow                 : constant Diagnostic_Id := 500;
+   RT_Stack_Not_Single                : constant Diagnostic_Id := 501;
+   RT_Numeric_Error                   : constant Diagnostic_Id := 502;
 
    function Id_Image (Id : Diagnostic_Id) return String;
    --  Five-digit zero-padded id (e.g. 00001).

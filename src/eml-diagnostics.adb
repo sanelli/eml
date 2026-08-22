@@ -43,11 +43,11 @@ package body Eml.Diagnostics is
          when CLI_Missing_Command =>
             return
               "missing command "
-              & "(expected help, preproc, tokenize, parse, or compile)";
+              & "(expected help, preproc, tokenize, parse, compile, or run)";
          when CLI_Missing_Command_With_Arg =>
             return
               "missing command "
-              & "(expected help, preproc, tokenize, parse, or compile); "
+              & "(expected help, preproc, tokenize, parse, compile, or run); "
               & "got '"
               & Param1
               & "'";
@@ -87,7 +87,11 @@ package body Eml.Diagnostics is
             return
               "unknown command '"
               & Param1
-              & "' (expected help, preproc, tokenize, parse, or compile)";
+              & "' (expected help, preproc, tokenize, parse, compile, or run)";
+         when CLI_Run_Rejects_Output =>
+            return "run does not accept --output/-o";
+         when CLI_Run_Rejects_Output_Format =>
+            return "run does not accept --output-format/-of";
          when CLI_Input_Format_Required =>
             return
               "missing --input-format/-if "
@@ -212,6 +216,14 @@ package body Eml.Diagnostics is
             return "stack underflow reconstructing BEML";
          when BE_Stack_Not_Single =>
             return "BEML program does not reduce to a single value";
+
+         when RT_Stack_Underflow =>
+            return "stack underflow at EML";
+         when RT_Stack_Not_Single =>
+            return "stack depth is not 1 after program";
+         when RT_Numeric_Error =>
+            return "numeric error evaluating EML";
+
          when others =>
             return "internal diagnostic error";
       end case;

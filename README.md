@@ -42,6 +42,36 @@ the file extension.
 
 Diagnostics print as `[ID] line:column description` (five-digit IDs).
 
+## Pipelines
+
+```mermaid
+flowchart TD
+  mxeml[mxeml] --> preproc
+  teml[teml] --> preproc
+  preproc --> preprocOut["preproc: expanded .mxeml / .teml"]
+  preproc --> tokenize
+  eml[eml] --> tokenize
+  tokenize --> tokensOut["tokenize: .tokens"]
+  tokenize --> parse
+  beml[beml] --> bemlRead[Beml_Reader]
+  bemlRead --> parse
+  parse --> parseMx["parse mxeml: AST dump"]
+  parse --> parseIr["parse teml/eml/beml: IR tree dump"]
+  parse --> lowerOrIR[Expr_Lower or IR tree]
+  lowerOrIR --> irNode[IR_Eml.Node]
+  irNode --> writeEml["compile -of eml"]
+  writeEml --> emlFile[.eml]
+  irNode --> flatten[IR_Eml.Flatten]
+  flatten --> writeBeml["compile -of beml"]
+  writeBeml --> bemlFile[.beml]
+  flatten --> stack[Complex stack]
+  stack --> stdout["eml run: stdout compact Complex"]
+```
+
+`preproc`, `tokenize`, and `parse` stop at their dump (expanded text, tokens,
+or tree). `compile` and `run` continue from `IR_Eml.Node`; `run` Flattens to
+opcodes and evaluates on a complex stack (no output file).
+
 ## Run
 
 ```powershell
@@ -52,6 +82,7 @@ alr run
 ./bin/eml --no-logo parse -i path/to/file.mxeml
 ./bin/eml --no-logo compile -i path/to/file.mxeml
 ./bin/eml --no-logo compile -if mxeml -of eml   # stdin math → textual .eml
+./bin/eml --no-logo run -i path/to/file.mxeml
 ```
 
 ### Preproc
@@ -113,6 +144,23 @@ Lower to stack-machine IR (`.beml` binary by default, or textual `.eml`):
 - Same-format compile is an error (`eml`→`eml`, `beml`→`beml`)
 - `--format` / `-f` is rejected; use `-of`
 
+### Run
+
+Evaluate IR EML and print one compact complex value on stdout. No `-o` / `-of`.
+
+```powershell
+./bin/eml run -i filename.mxeml
+./bin/eml run -i f.teml -v '$X=1'
+./bin/eml --no-logo run -if eml < prog.eml
+./bin/eml run -i f.beml
+```
+
+- Accepts all four input formats
+- `--var` / `-v` on **mxeml / teml** only (preprocessor paste). On `.eml` /
+  `.beml`, every `--var` is unused (same warn/error as compile)
+- `$NAME:VALUE` runtime bindings are not implemented yet
+- `--output` / `-o` and `--output-format` / `-of` are invalid CLI
+
 ## EML file formats
 
 ### Textual `.eml` (`--output-format eml`)
@@ -168,26 +216,29 @@ Example: `ONE`, `ONE`, `EML` → count `3`, one code byte `11000000` (binary).
 cases (`16_`–`25_`) and parameterized expressions using `$VARNAME`. Nested
 `.teml` samples (`t01_`…) cover the tree-text format. `run_samples.ps1`
 exercises every input format each command supports: `.teml` samples for
-preproc/tokenize/parse/compile, and stack `.eml` / `.beml` derived by compiling
-non-taylor samples into `.results/_chain/` then piping into tokenize/parse/compile.
+preproc/tokenize/parse/compile/run, and stack `.eml` / `.beml` derived by compiling
+non-taylor samples into `.results/_chain/` then piping into tokenize/parse/compile/run.
 
 ```powershell
 ./scripts/run_samples.ps1
 ./scripts/run_samples.ps1 -Operations preproc
 ./scripts/run_samples.ps1 -Operations tokenize
 ./scripts/run_samples.ps1 -Operations tokenize,parse
-./scripts/run_samples.ps1 -Operations tokenize,parse,compile
-./scripts/run_samples.ps1 --operations preproc tokenize parse compile
+./scripts/run_samples.ps1 -Operations tokenize,parse,compile,run
+./scripts/run_samples.ps1 --operations preproc tokenize parse compile run
 ```
 
 `-Operations` / `--operations` selects which front-end steps to run (`preproc`,
-`tokenize`, `parse`, `compile`). Pass a comma-separated list or multiple values after
+`tokenize`, `parse`, `compile`, `run`). Pass a comma-separated list or multiple values after
 `--operations`. If omitted, **all** operations are run.
 
 The script passes dummy `--var` bindings for sample variable names and
-`--warn none`. Outputs go to `.results/<operation>/` (gitignored). For `parse`,
-each sample is emitted in all four formats. For `compile`, each sample writes
-default `.beml` and `-of eml` `.eml`. Exit `1` if any sample fails.
+`--warn none`. Outputs go to `.results/<operation>/` (gitignored) except `run`,
+which captures stdout into a variable (not printed) and checks
+`|actual - expected| < 0.01`. Taylor `.mxeml` samples are skipped for `run`
+(and for IR chaining). For `parse`, each sample is emitted in all four formats.
+For `compile`, each sample writes default `.beml` and `-of eml` `.eml`. Exit `1`
+if any sample fails.
 
 ## Test
 
@@ -198,7 +249,8 @@ alr run -- eml_tests
 ```
 
 Coverage includes regex automata, preprocessor, mxeml/teml/eml tokenization,
-parsers, IR lowering, BEML reader, and CLI happy/negative paths.
+parsers, IR lowering, the interpreter, BEML reader, and CLI happy/negative
+paths.
 
 ## Layout
 
@@ -206,7 +258,7 @@ parsers, IR lowering, BEML reader, and CLI happy/negative paths.
 |------|------|
 | `src/eml.ads` | Root `Eml` package |
 | `src/eml-main.adb` | Main procedure (`Eml.Main` → binary `eml`) |
-| `src/eml-cli.*` | CLI (`preproc`, `tokenize`, `parse`, `compile`, banner, flags) |
+| `src/eml-cli.*` | CLI (`preproc`, `tokenize`, `parse`, `compile`, `run`, banner, flags) |
 | `src/eml-diagnostics.*` | Diagnostic ID catalog and formatting |
 | `src/eml-info.*` | Program name / author / version / commit |
 | `src/regex_automata.*` | In-repo regex → NFA library |
@@ -221,7 +273,7 @@ parsers, IR lowering, BEML reader, and CLI happy/negative paths.
 | `src/beml_reader.*` | `.beml` binary reader |
 | `src/beml_parser.*` | BEML opcodes → IR |
 | `src/ir_eml.*` | Shared IR EML tree, encoders, and tree dumps |
-| `src/interpreter.*` | Interpreter stub |
+| `src/interpreter.*` | In-process ONE/EML interpreter (`eml run`) |
 | `tests/` | Unit and CLI tests |
 | `scripts/embed_git_commit.ps1` | Pre-build short-hash embed |
-| `scripts/run_samples.ps1` | Batch preproc / tokenize / parse / compile samples |
+| `scripts/run_samples.ps1` | Batch preproc / tokenize / parse / compile / run samples |

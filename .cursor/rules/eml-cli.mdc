@@ -53,8 +53,9 @@ On `preproc`, `tokenize`, `parse`, and `compile`:
 | `tokenize` | `mxeml`, `teml`, `eml` (not `beml`) |
 | `parse` | all four |
 | `compile` | all four |
+| `run` | all four |
 
-Incorrect payload (bad tokens, bad magic, malformed stack, extra bytes, …) → diagnostic + exit `1`, **no output file**. Lex errors on `tokenize` still dump valid tokens then fail. `parse` / `compile` stop before writing on lex/parse/format errors.
+Incorrect payload (bad tokens, bad magic, malformed stack, extra bytes, …) → diagnostic + exit `1`, **no output file**. Lex errors on `tokenize` still dump valid tokens then fail. `parse` / `compile` / `run` stop before writing (or printing a result) on lex/parse/format errors.
 
 ## Diagnostics
 
@@ -74,6 +75,7 @@ eml help preproc
 eml help tokenize
 eml help parse
 eml help compile
+eml help run
 ```
 
 - `eml help` — usage, command list, input formats, and common options on stdout; exit `0`
@@ -171,6 +173,7 @@ Usage:
   eml tokenize [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo] [--output-format|-of tokens]
   eml parse [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo] [--output-format|-of mermaid|md|dot|svg]
   eml compile [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo] [--output-format|-of eml|beml]
+  eml run [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
 Try 'eml help' for more information.
 ```
 
@@ -289,13 +292,28 @@ Native / .NET / JVM backends (`-of cli`, `bytecode`, `binary`) are not implement
 
 ## `run`
 
-Interpret. Bind variables as extra arguments `$NAME:VALUE`. `VALUE` is a source constant (decimal, scientific, `i`, `e`, `pi`, `phi`, …).
+Interpret IR EML on a Long_Float complex stack and print one compact complex value on **stdout**. No file output.
 
 ```
-eml run --input filename.mxeml $VAR1:1.345 $VAR2:i $VAR3:e $VAR4:99
-eml run --input filename.teml $VAR1:1.345 $VAR2:i $VAR3:e $VAR4:99
-eml run --input filename.eml $VAR1:1.345 $VAR2:i $VAR3:e $VAR4:99
-eml run --input filename.beml $VAR1:1.345 $VAR2:i $VAR3:e $VAR4:99
+eml run [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
+```
+
+- Effective input may be any of the four formats
+- `--output` / `-o` and `--output-format` / `-of` are invalid CLI (dedicated diagnostics, then usage)
+- `--var` / `-v` and `--warn` / `-w` — same shared rules as compile. Meaningful only for **mxeml / teml** (preprocessor paste). On **eml / beml**, every `--var` is unused
+- `$NAME:VALUE` extras are **not implemented** (still `CLI_Unexpected_Argument`)
+- `eml help run` → usage on stdout, exit `0`
+- Exit `0` on success; `1` on invalid CLI, I/O, preprocess, lex, parse, or runtime errors
+
+Pipeline (by format): same front-end as compile (`Load_IR`), then `IR_Eml.Flatten` → evaluate `ONE` / `EML` → print `Format_Complex`.
+
+Examples:
+
+```
+eml run -i filename.mxeml
+eml run -i f.teml -v '$X=1'
+eml --no-logo run -if eml < prog.eml
+eml run -i f.beml
 ```
 
 Do not invent extra subcommands or flags beyond this surface unless the user asks.

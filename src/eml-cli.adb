@@ -13,7 +13,10 @@ with Expr_Lower;
 with Expr_Preprocessor;
 with Expr_Parser;
 with Expr_Tokenizer;
+with Interpreter;
 with IR_Eml;
+
+use type Interpreter.Eval_Status;
 with Teml_Parser;
 with Teml_Tokenizer;
 
@@ -80,6 +83,16 @@ package body Eml.CLI is
         & "[--no-color] [--no-logo]";
    end Common_Options;
 
+   function Run_Options return String is
+   begin
+      return
+        "[--input|-i <file>] "
+        & "[--input-format|-if mxeml|teml|eml|beml] "
+        & "[--var|-v $NAME=EXPR]... "
+        & "[--warn|-w default|none|error] "
+        & "[--no-color] [--no-logo]";
+   end Run_Options;
+
    procedure Put_Usage_Lines (Use_Color : Boolean) is
    begin
       Emit_Error_Line ("Usage:", Use_Color);
@@ -104,6 +117,10 @@ package body Eml.CLI is
         ("  eml compile "
          & Common_Options
          & " [--output-format|-of eml|beml]",
+         Use_Color);
+      Emit_Error_Line
+        ("  eml run "
+         & Run_Options,
          Use_Color);
    end Put_Usage_Lines;
 
@@ -137,7 +154,7 @@ package body Eml.CLI is
       Put_Stdout
         ("  compile    Lower a source file to EML IR (.beml or .eml)");
       Put_Stdout
-        ("             (run is not implemented yet)");
+        ("  run        Evaluate IR EML and print a complex result");
       Put_Stdout ("");
       Put_Stdout ("Input formats (--input-format / -if):");
       Put_Stdout
@@ -327,6 +344,36 @@ package body Eml.CLI is
       Put_Stdout ("  eml compile -i f.eml -of beml -o out.beml");
       Put_Stdout ("  eml --no-logo compile -if mxeml < in.mxeml -of eml");
    end Put_Compile_Help;
+
+   procedure Put_Run_Help is
+   begin
+      Put_Stdout ("eml run - evaluate a program and print a complex result");
+      Put_Stdout ("");
+      Put_Stdout ("Usage:");
+      Put_Stdout ("  eml run " & Run_Options);
+      Put_Stdout ("");
+      Put_Stdout ("Options:");
+      Put_Stdout
+        ("  --input, -i <file>          Optional input file or stdin");
+      Put_Stdout
+        ("  --input-format, -if FMT     mxeml, teml, eml, or beml");
+      Put_Stdout
+        ("  --var, -v $NAME=EXPR        Preprocessor binding "
+         & "(mxeml/teml only)");
+      Put_Stdout
+        ("  --warn, -w MODE             default, none, or error");
+      Put_Stdout ("");
+      Put_Stdout
+        ("run does not accept --output/-o or --output-format/-of.");
+      Put_Stdout
+        ("On success, prints one compact complex value on stdout.");
+      Put_Stdout ("");
+      Put_Stdout ("Examples:");
+      Put_Stdout ("  eml run -i filename.mxeml");
+      Put_Stdout ("  eml run -i f.teml -v '$X=1'");
+      Put_Stdout ("  eml --no-logo run -if eml < prog.eml");
+      Put_Stdout ("  eml run -i f.beml");
+   end Put_Run_Help;
 
    function Read_File (Path : String) return String is
       File   : Ada.Text_IO.File_Type;
@@ -1208,23 +1255,18 @@ package body Eml.CLI is
       end case;
    end Write_Compile_Output;
 
-   function Run_Emlir
-     (Source_Label : String;
-      In_Fmt       : Input_Format;
-      Source       : String;
-      Bin_Data     : Ada.Streams.Stream_Element_Array;
-      Output_Path  : String;
-      Has_Output   : Boolean;
-      Fmt          : IR_Eml.Output_Format;
-      Bindings     : Binding_Array;
-      Warn         : Warn_Mode;
-      Use_Color    : Boolean) return Ada.Command_Line.Exit_Status
+   function Load_IR
+     (In_Fmt    : Input_Format;
+      Source    : String;
+      Bin_Data  : Ada.Streams.Stream_Element_Array;
+      Bindings  : Binding_Array;
+      Warn      : Warn_Mode;
+      Use_Color : Boolean;
+      Root      : out IR_Eml.Node_Access)
+      return Ada.Command_Line.Exit_Status
    is
-      Meta : constant IR_Eml.Dump_Meta :=
-        (Source_Path => To_Unbounded_String (Source_Label),
-         Version     => To_Unbounded_String (Info.Version),
-         Compiled_At => Ada.Calendar.Clock);
    begin
+      Root := null;
       case In_Fmt is
          when Mxeml =>
             declare
@@ -1251,16 +1293,13 @@ package body Eml.CLI is
                declare
                   Parsed : constant Expr_Parser.Parse_Result :=
                     Expr_Parser.Parse (Tok.Tokens.all);
-                  IR     : IR_Eml.Node_Access;
                begin
                   if Parsed.Had_Error then
                      Emit_Expr_Parse_Error (Parsed, Use_Color);
                      return Ada.Command_Line.Failure;
                   end if;
 
-                  IR := Expr_Lower.Lower (Parsed.Root);
-                  Write_Compile_Output
-                    (IR, Meta, Output_Path, Has_Output, Fmt);
+                  Root := Expr_Lower.Lower (Parsed.Root);
                   return Ada.Command_Line.Success;
                end;
             end;
@@ -1296,8 +1335,7 @@ package body Eml.CLI is
                      return Ada.Command_Line.Failure;
                   end if;
 
-                  Write_Compile_Output
-                    (Parsed.Root, Meta, Output_Path, Has_Output, Fmt);
+                  Root := Parsed.Root;
                   return Ada.Command_Line.Success;
                end;
             end;
@@ -1322,8 +1360,7 @@ package body Eml.CLI is
                      return Ada.Command_Line.Failure;
                   end if;
 
-                  Write_Compile_Output
-                    (Parsed.Root, Meta, Output_Path, Has_Output, Fmt);
+                  Root := Parsed.Root;
                   return Ada.Command_Line.Success;
                end;
             end;
@@ -1347,13 +1384,90 @@ package body Eml.CLI is
                      return Ada.Command_Line.Failure;
                   end if;
 
-                  Write_Compile_Output
-                    (Parsed.Root, Meta, Output_Path, Has_Output, Fmt);
+                  Root := Parsed.Root;
                   return Ada.Command_Line.Success;
                end;
             end;
       end case;
+   end Load_IR;
+
+   function Run_Emlir
+     (Source_Label : String;
+      In_Fmt       : Input_Format;
+      Source       : String;
+      Bin_Data     : Ada.Streams.Stream_Element_Array;
+      Output_Path  : String;
+      Has_Output   : Boolean;
+      Fmt          : IR_Eml.Output_Format;
+      Bindings     : Binding_Array;
+      Warn         : Warn_Mode;
+      Use_Color    : Boolean) return Ada.Command_Line.Exit_Status
+   is
+      Meta : constant IR_Eml.Dump_Meta :=
+        (Source_Path => To_Unbounded_String (Source_Label),
+         Version     => To_Unbounded_String (Info.Version),
+         Compiled_At => Ada.Calendar.Clock);
+      Root   : IR_Eml.Node_Access;
+      Status : Ada.Command_Line.Exit_Status;
+   begin
+      Status :=
+        Load_IR (In_Fmt, Source, Bin_Data, Bindings, Warn, Use_Color, Root);
+      if Status /= Ada.Command_Line.Success then
+         return Status;
+      end if;
+      Write_Compile_Output (Root, Meta, Output_Path, Has_Output, Fmt);
+      return Ada.Command_Line.Success;
    end Run_Emlir;
+
+   function Run_Interpret
+     (In_Fmt    : Input_Format;
+      Source    : String;
+      Bin_Data  : Ada.Streams.Stream_Element_Array;
+      Bindings  : Binding_Array;
+      Warn      : Warn_Mode;
+      Use_Color : Boolean) return Ada.Command_Line.Exit_Status
+   is
+      Root   : IR_Eml.Node_Access;
+      Status : Ada.Command_Line.Exit_Status;
+      Eval   : Interpreter.Eval_Result;
+      Line   : Natural;
+      Col    : Natural;
+      Id     : Diagnostic_Id;
+   begin
+      Status :=
+        Load_IR (In_Fmt, Source, Bin_Data, Bindings, Warn, Use_Color, Root);
+      if Status /= Ada.Command_Line.Success then
+         return Status;
+      end if;
+
+      Eval := Interpreter.Evaluate (Root);
+      if Eval.Status = Interpreter.Ok then
+         Put_Stdout (Interpreter.Format_Complex (Eval.Value));
+         return Ada.Command_Line.Success;
+      end if;
+
+      case Eval.Status is
+         when Interpreter.Stack_Underflow =>
+            Id := RT_Stack_Underflow;
+         when Interpreter.Stack_Not_Single =>
+            Id := RT_Stack_Not_Single;
+         when Interpreter.Eval_Numeric_Error =>
+            Id := RT_Numeric_Error;
+         when Interpreter.Ok =>
+            Id := RT_Numeric_Error;
+      end case;
+
+      if Eval.Index = 0 then
+         Line := 0;
+         Col := 0;
+      else
+         Line := 1;
+         Col := Eval.Index;
+      end if;
+
+      Emit_Error_Line (Format_Line (Id, Line, Col), Use_Color);
+      return Ada.Command_Line.Failure;
+   end Run_Interpret;
 
    function Run_Internal
      (Args               : Arg_Array;
@@ -1633,6 +1747,9 @@ package body Eml.CLI is
          elsif To_String (Topic) = "compile" then
             Put_Compile_Help;
             return Ada.Command_Line.Success;
+         elsif To_String (Topic) = "run" then
+            Put_Run_Help;
+            return Ada.Command_Line.Success;
          else
             Fail_CLI
               (CLI_Unknown_Help_Topic, Use_Color, To_String (Topic));
@@ -1644,6 +1761,7 @@ package body Eml.CLI is
         and then To_String (Cmd) /= "tokenize"
         and then To_String (Cmd) /= "parse"
         and then To_String (Cmd) /= "compile"
+        and then To_String (Cmd) /= "run"
       then
          Fail_CLI (CLI_Unknown_Command, Use_Color, To_String (Cmd));
          return Ada.Command_Line.Failure;
@@ -1951,6 +2069,67 @@ package body Eml.CLI is
                            To_String (Output_Path),
                            Have_Output,
                            Tree_Fmt,
+                           Use_Color);
+                     end;
+               end case;
+            exception
+               when E : others =>
+                  Emit_Error_Line
+                    (Format_Line
+                       (CLI_IO_Error,
+                        0,
+                        0,
+                        Ada.Exceptions.Exception_Message (E)),
+                     Use_Color);
+                  return Ada.Command_Line.Failure;
+            end;
+         end if;
+
+         --  run
+         if To_String (Cmd) = "run" then
+            if Have_Output then
+               Fail_CLI (CLI_Run_Rejects_Output, Use_Color);
+               return Ada.Command_Line.Failure;
+            end if;
+            if Have_Output_Format then
+               Fail_CLI (CLI_Run_Rejects_Output_Format, Use_Color);
+               return Ada.Command_Line.Failure;
+            end if;
+
+            begin
+               case In_Fmt is
+                  when Mxeml | Teml | Stack_Eml =>
+                     declare
+                        Source_Text : constant String :=
+                          (if Have_Input then
+                             Read_File (To_String (Input_Path))
+                           elsif Have_Injected_Text then Injected_Text
+                           else Read_Stdin_Text);
+                     begin
+                        return Run_Interpret
+                          (In_Fmt,
+                           Source_Text,
+                           Empty_Stream,
+                           Binds,
+                           Warn,
+                           Use_Color);
+                     end;
+
+                  when Beml =>
+                     declare
+                        Source_Bin :
+                          constant Ada.Streams.Stream_Element_Array :=
+                          (if Have_Input then
+                             Read_Binary_File (To_String (Input_Path))
+                           elsif Have_Injected_Bin then Injected_Bin
+                           else Read_Stdin_Binary);
+                     begin
+                        return Run_Interpret
+                          (In_Fmt,
+                           "",
+                           Source_Bin,
+                           Binds,
+                           Warn,
                            Use_Color);
                      end;
                end case;

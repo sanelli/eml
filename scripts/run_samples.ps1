@@ -3,20 +3,22 @@
 # Usage:
 #   pwsh -File scripts/run_samples.ps1
 #   pwsh -File scripts/run_samples.ps1 -Operations tokenize
-#   pwsh -File scripts/run_samples.ps1 -Operations tokenize,parse,preproc
-#   pwsh -File scripts/run_samples.ps1 --operations tokenize parse
+#   pwsh -File scripts/run_samples.ps1 -Operations tokenize,parse,preproc,run
+#   pwsh -File scripts/run_samples.ps1 --operations tokenize parse run
 #
-# -Operations / --operations: one or more of preproc, tokenize, parse, compile.
-# If omitted (or empty), all operations are run.
+# -Operations / --operations: one or more of preproc, tokenize, parse,
+# compile, run. If omitted (or empty), all operations are run.
 #
 # Input-format coverage:
 #   preproc  — .mxeml and .teml samples
 #   tokenize — .mxeml, .teml, and stack .eml (piped from compile)
 #   parse    — .mxeml, .teml, .eml, .beml (IR formats piped from compile)
 #   compile  — .mxeml, .teml → .beml/.eml; then .eml↔.beml conversion
+#   run      — .mxeml, .teml, chained .eml/.beml; stdout captured, not printed
 #
-# Results are written under .results/<operation>/. Intermediate IR for chaining
-# lives under .results/_chain/. Exit 0 if every check succeeds, otherwise 1.
+# Results are written under .results/<operation>/ (except run, which has no
+# output file). Intermediate IR for chaining lives under .results/_chain/.
+# Exit 0 if every check succeeds, otherwise 1.
 
 [CmdletBinding()]
 param(
@@ -33,7 +35,7 @@ $Root = Split-Path -Parent $PSScriptRoot
 $SamplesDir = Join-Path $Root "samples"
 $Eml = Join-Path $Root "bin" "eml"
 $ChainDir = Join-Path $Root ".results" "_chain"
-$AllOperations = @("preproc", "tokenize", "parse", "compile")
+$AllOperations = @("preproc", "tokenize", "parse", "compile", "run")
 
 # Dummy bindings for parameterized samples; --warn none suppresses unused warnings.
 $SampleVarArgs = @(
@@ -604,6 +606,201 @@ function Invoke-CompileSamples {
     return @{ Failed = $(if ($FailCount -gt 0) { 1 } else { 0 }); Ok = $OkCount; Fail = $FailCount }
 }
 
+function ConvertFrom-EmlComplex {
+    param([string] $Text)
+
+    if ($null -eq $Text) {
+        throw "empty run output"
+    }
+    $T = ($Text | Out-String).Trim()
+    if ($T.Length -eq 0) {
+        throw "empty run output"
+    }
+
+    $Cult = [System.Globalization.CultureInfo]::InvariantCulture
+    if ($T -eq "0") {
+        return @{ Re = [double]0; Im = [double]0 }
+    }
+    if ($T -eq "i") {
+        return @{ Re = [double]0; Im = [double]1 }
+    }
+    if ($T -eq "-i") {
+        return @{ Re = [double]0; Im = [double](-1) }
+    }
+
+    if ($T -match '^(.+) \+ (.+) i$') {
+        return @{
+            Re = [double]::Parse($Matches[1], $Cult)
+            Im = [double]::Parse($Matches[2], $Cult)
+        }
+    }
+    if ($T -match '^(.+) - (.+) i$') {
+        return @{
+            Re = [double]::Parse($Matches[1], $Cult)
+            Im = -[double]::Parse($Matches[2], $Cult)
+        }
+    }
+    if ($T -match '^(.+) i$') {
+        return @{
+            Re = [double]0
+            Im = [double]::Parse($Matches[1], $Cult)
+        }
+    }
+
+    return @{
+        Re = [double]::Parse($T, $Cult)
+        Im = [double]0
+    }
+}
+
+function Test-ComplexClose {
+    param($Actual, $Expected, [double] $Tol = 0.01)
+
+    $Dr = [double]$Actual.Re - [double]$Expected.Re
+    $Di = [double]$Actual.Im - [double]$Expected.Im
+    return [Math]::Sqrt(($Dr * $Dr) + ($Di * $Di)) -lt $Tol
+}
+
+function Get-RunExpected {
+    return @{
+        "01_trig_basics"              = @{ Re = 1.784457; Im = 0.0 }
+        "02_hyperbolic"               = @{ Re = 3.180399; Im = 0.0 }
+        "03_log_sqrt"                 = @{ Re = 3.5; Im = 0.0 }
+        "04_arithmetic_ops"           = @{ Re = 67.285714; Im = 0.0 }
+        "05_all_functions_mix"        = @{ Re = 1.603065; Im = 0.540302 }
+        "06_euler_identity"           = @{ Re = 0.0; Im = 0.0 }
+        "07_golden_ratio"             = @{ Re = 1.618034; Im = 0.0 }
+        "10_harmonic_series"          = @{ Re = 2.717857; Im = 0.0 }
+        "11_pythagorean"              = @{ Re = 1.414214; Im = 0.0 }
+        "12_gaussian"                 = @{ Re = 0.241971; Im = 0.0 }
+        "13_logistic_sigmoid"         = @{ Re = 0.731059; Im = 0.0 }
+        "14_circle_area"              = @{ Re = 3.141593; Im = 0.0 }
+        "15_mass_energy"              = @{ Re = 1.0; Im = 0.0 }
+        "16_precedence_add_mul"       = @{ Re = 7.0; Im = 0.0 }
+        "17_precedence_parens"        = @{ Re = 9.0; Im = 0.0 }
+        "18_precedence_power_right"   = @{ Re = 512.0; Im = 0.0 }
+        "19_precedence_unary_power"   = @{ Re = -4.0; Im = 0.0 }
+        "20_precedence_mul_div_left"  = @{ Re = 4.0; Im = 0.0 }
+        "21_precedence_add_mul_power" = @{ Re = 19.0; Im = 0.0 }
+        "22_precedence_mul_mix"       = @{ Re = 11.285714; Im = 0.0 }
+        "23_precedence_calls_and_ops" = @{ Re = 3.0; Im = 0.0 }
+        "24_precedence_unary_nested"  = @{ Re = 15.0; Im = 0.0 }
+        "25_precedence_deep_parens"   = @{ Re = 9.0; Im = 0.0 }
+        "t01_e"                       = @{ Re = 2.718282; Im = 0.0 }
+        "t02_exp_var"                 = @{ Re = 2.718282; Im = 0.0 }
+        "t03_nested"                  = @{ Re = 14.154262; Im = 0.0 }
+    }
+}
+
+function Invoke-OneRunCheck {
+    param(
+        [string] $InputPath,
+        [string] $Base,
+        [string] $InputFormat,
+        [string] $CliOpts,
+        [object] $Expected,
+        [string[]] $VarArgs,
+        [ref] $OkCount,
+        [ref] $FailCount
+    )
+
+    if ($null -eq $Expected) {
+        Write-ResultRow $Base $InputFormat "stdout" $CliOpts $false "no expected value"
+        $FailCount.Value++
+        return
+    }
+
+    $RunOut = $null
+    if ($VarArgs.Count -gt 0) {
+        $RunOut = & $script:Eml --no-logo --no-color run -i $InputPath @VarArgs
+    }
+    else {
+        $RunOut = & $script:Eml --no-logo --no-color run -i $InputPath
+    }
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-ResultRow $Base $InputFormat "stdout" $CliOpts $false "exit $LASTEXITCODE"
+        $FailCount.Value++
+        return
+    }
+
+    try {
+        $Got = ConvertFrom-EmlComplex -Text ($RunOut | Out-String)
+    }
+    catch {
+        Write-ResultRow $Base $InputFormat "stdout" $CliOpts $false "unparsable stdout"
+        $FailCount.Value++
+        return
+    }
+
+    if (-not (Test-ComplexClose -Actual $Got -Expected $Expected)) {
+        $Dr = [double]$Got.Re - [double]$Expected.Re
+        $Di = [double]$Got.Im - [double]$Expected.Im
+        $Dist = [Math]::Sqrt(($Dr * $Dr) + ($Di * $Di))
+        $DistText = $Dist.ToString("0.000000", [System.Globalization.CultureInfo]::InvariantCulture)
+        Write-ResultRow $Base $InputFormat "stdout" $CliOpts $false "distance $DistText >= 0.01"
+        $FailCount.Value++
+        return
+    }
+
+    Write-ResultRow $Base $InputFormat "stdout" $CliOpts $true
+    $OkCount.Value++
+}
+
+function Invoke-RunSamples {
+    $OkCount = 0
+    $FailCount = 0
+    $CliOpts = "-v … -w none"
+    $ExpectedMap = Get-RunExpected
+
+    $RunMxeml = @($script:MxemlSamples | Where-Object { $_.Name -notmatch 'taylor' })
+    $RunNames = [System.Collections.Generic.List[string]]::new()
+    foreach ($S in $RunMxeml) {
+        [void]$RunNames.Add((Get-SampleBaseName $S))
+    }
+    foreach ($S in $script:TemlSamples) {
+        [void]$RunNames.Add((Get-SampleBaseName $S))
+    }
+
+    Start-ResultTable `
+        -Samples $RunNames.ToArray() `
+        -Inputs @("mxeml", "teml", "eml", "beml") `
+        -Outputs @("stdout") `
+        -OptionsList @($CliOpts, "")
+
+    foreach ($Sample in $RunMxeml) {
+        $Base = Get-SampleBaseName $Sample
+        Invoke-OneRunCheck $Sample.FullName $Base "mxeml" $CliOpts `
+            $ExpectedMap[$Base] $SampleVarArgs ([ref]$OkCount) ([ref]$FailCount)
+    }
+
+    foreach ($Sample in $script:TemlSamples) {
+        $Base = Get-SampleBaseName $Sample
+        Invoke-OneRunCheck $Sample.FullName $Base "teml" $CliOpts `
+            $ExpectedMap[$Base] $SampleVarArgs ([ref]$OkCount) ([ref]$FailCount)
+    }
+
+    $null = Ensure-ChainArtifacts
+
+    $EmlFiles = @(Get-ChildItem -LiteralPath $script:ChainDir -Filter "*.eml" | Sort-Object Name)
+    foreach ($File in $EmlFiles) {
+        $Base = Get-SampleBaseName $File
+        Invoke-OneRunCheck $File.FullName $Base "eml" "" `
+            $ExpectedMap[$Base] @() ([ref]$OkCount) ([ref]$FailCount)
+    }
+
+    $BemlFiles = @(Get-ChildItem -LiteralPath $script:ChainDir -Filter "*.beml" | Sort-Object Name)
+    foreach ($File in $BemlFiles) {
+        $Base = Get-SampleBaseName $File
+        Invoke-OneRunCheck $File.FullName $Base "beml" "" `
+            $ExpectedMap[$Base] @() ([ref]$OkCount) ([ref]$FailCount)
+    }
+
+    $Total = $OkCount + $FailCount
+    Write-OpSummary -Op "run" -OkCount $OkCount -FailCount $FailCount -Total $Total
+    return @{ Failed = $(if ($FailCount -gt 0) { 1 } else { 0 }); Ok = $OkCount; Fail = $FailCount }
+}
+
 foreach ($Op in $Operations) {
     Write-SectionHeader $Op.ToUpperInvariant()
 
@@ -618,6 +815,9 @@ foreach ($Op in $Operations) {
     }
     elseif ($Op -eq "compile") {
         $Result = Invoke-CompileSamples
+    }
+    elseif ($Op -eq "run") {
+        $Result = Invoke-RunSamples
     }
     else {
         Write-Error "unknown operation '$Op'."
