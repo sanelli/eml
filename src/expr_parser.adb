@@ -36,8 +36,6 @@ package body Expr_Parser is
             return "*";
          when Div_Node =>
             return "/";
-         when IDiv_Node =>
-            return "%";
          when Pow_Node =>
             return "^";
       end case;
@@ -128,16 +126,14 @@ package body Expr_Parser is
       end Make_Call;
 
       --  Precedence levels (higher binds tighter):
-      --  1 = add/sub, 2 = mul/div/%, 3 = power
+      --  1 = add/sub, 2 = mul/div, 3 = power
       --  Unary prefix uses Min_Bp = 3 so power binds tighter than unary.
       function Lbp (Kind : Expr_Tokenizer.Token_Kind) return Natural is
       begin
          case Kind is
             when Expr_Tokenizer.Plus | Expr_Tokenizer.Minus =>
                return 1;
-            when Expr_Tokenizer.Star
-               | Expr_Tokenizer.Slash
-               | Expr_Tokenizer.Percent =>
+            when Expr_Tokenizer.Star | Expr_Tokenizer.Slash =>
                return 2;
             when Expr_Tokenizer.Caret =>
                return 3;
@@ -164,8 +160,6 @@ package body Expr_Parser is
                return Mul_Node;
             when Expr_Tokenizer.Slash =>
                return Div_Node;
-            when Expr_Tokenizer.Percent =>
-               return IDiv_Node;
             when Expr_Tokenizer.Caret =>
                return Pow_Node;
             when others =>

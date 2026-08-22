@@ -20,8 +20,6 @@ package body Expr_Tokenizer is
      Regex_Automata.Compile ("\*");
    Slash_Pat : constant Regex_Automata.Engine :=
      Regex_Automata.Compile ("/");
-   Percent_Pat : constant Regex_Automata.Engine :=
-     Regex_Automata.Compile ("%");
    Caret_Pat : constant Regex_Automata.Engine :=
      Regex_Automata.Compile ("\^");
    LParen_Pat : constant Regex_Automata.Engine :=
@@ -40,8 +38,6 @@ package body Expr_Tokenizer is
             return "STAR";
          when Slash =>
             return "SLASH";
-         when Percent =>
-            return "PERCENT";
          when Caret =>
             return "CARET";
          when LParen =>
@@ -240,11 +236,6 @@ package body Expr_Tokenizer is
                      elsif Match (Slash_Pat, Pos) > 0 then
                         Emit_Token
                           (Slash, "/", Start_Line, Start_Column);
-                        Advance_Position (Source, Pos, 1, Line, Column);
-                        Pos := Pos + 1;
-                     elsif Match (Percent_Pat, Pos) > 0 then
-                        Emit_Token
-                          (Percent, "%", Start_Line, Start_Column);
                         Advance_Position (Source, Pos, 1, Line, Column);
                         Pos := Pos + 1;
                      elsif Match (Caret_Pat, Pos) > 0 then

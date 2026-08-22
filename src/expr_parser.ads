@@ -16,7 +16,6 @@ package Expr_Parser is
       Sub_Node,
       Mul_Node,
       Div_Node,
-      IDiv_Node,
       Pow_Node,
       Call_Node);
 

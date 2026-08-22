@@ -9,7 +9,6 @@ package Expr_Tokenizer is
       Minus,
       Star,
       Slash,
-      Percent,
       Caret,
       LParen,
       RParen,

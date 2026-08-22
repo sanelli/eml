@@ -12,7 +12,6 @@ Input is a **textual mathematical expression** in a **`.teml`** file. It must su
 | Form | Meaning |
 |---|---|
 | `+` `-` `*` `/` | arithmetic |
-| `%` | integer division |
 | `^` | exponentiation |
 | `log` `sin` `cos` `tan` `sqrt` `sinh` `cosh` `tanh` | functions |
 
@@ -25,7 +24,7 @@ Parentheses change structure only (they are not syntax-tree nodes). One expressi
 | Primary | number, constant, `$VAR`, `(e)`, `func(e)` | n/a |
 | Unary | prefix `+` `-` | right |
 | Power | `^` | right |
-| Mul | `*` `/` `%` | left |
+| Mul | `*` `/` | left |
 | Add | `+` `-` | left |
 
 Examples: `1+2*3` is add(1, mul(2, 3)); `2^3^2` is pow(2, pow(3, 2)); `-2^2` is neg(pow(2, 2)). Functions take exactly one parenthesized argument. Implicit multiplication / juxtaposition is not allowed.

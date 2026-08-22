@@ -123,7 +123,21 @@ package body Expr_Tokenizer_Tests is
       declare
          R : constant Tokenize_Result := Tokenize ("2%3");
       begin
-         Require_Token (R.Tokens (2), Percent, "%", 1, 2, "percent");
+         Require (R.Had_Errors, "percent: error");
+         Require (R.Tokens'Length = 2, "percent: valid token count");
+         Require (R.Diagnostics'Length = 1, "percent: diag count");
+         if R.Tokens'Length >= 2 then
+            Require_Token (R.Tokens (1), Number, "2", 1, 1, "percent-num");
+            Require_Token (R.Tokens (2), Number, "3", 1, 3, "percent-denom");
+         end if;
+         if R.Diagnostics'Length >= 1 then
+            Require (R.Diagnostics (1).Line = 1, "percent: diag line");
+            Require (R.Diagnostics (1).Column = 2, "percent: diag column");
+            Require
+              (To_String (R.Diagnostics (1).Message)
+               = "unexpected character '%'",
+               "percent: diag message");
+         end if;
       end;
 
       declare

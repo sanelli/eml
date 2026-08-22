@@ -123,10 +123,14 @@ package body Expr_Parser_Tests is
       end;
 
       declare
-         R : constant Expr_Parser.Parse_Result := Parse_Source ("2%3");
+         Tok : constant Expr_Tokenizer.Tokenize_Result :=
+           Expr_Tokenizer.Tokenize ("2%3");
+         R   : Expr_Parser.Parse_Result;
       begin
-         Require (not R.Had_Error, "idiv: ok");
-         Require_Kind (R.Root, Expr_Parser.IDiv_Node, "idiv-root");
+         Require (Tok.Had_Errors, "percent-tok: lex error");
+         R := Expr_Parser.Parse (Tok.Tokens.all);
+         Require (R.Had_Error, "percent: err");
+         Require (R.Root = null, "percent: no root");
       end;
 
       declare
