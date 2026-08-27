@@ -13,7 +13,8 @@
 #   preproc  — .mxeml and .teml samples
 #   tokenize — .mxeml, .teml, and stack .eml (piped from compile)
 #   parse    — .mxeml, .teml, .eml, .beml (IR formats piped from compile)
-#   compile  — .mxeml, .teml → .beml/.eml/.js/.c/clib; then .eml↔.beml and IR→js/c/clib
+#   compile  — .mxeml, .teml → .beml/.eml/.js/.c/clib + .NET source/IL;
+#              csharpdll/csharplibdll/csharpexe when dotnet is on PATH
 #   run      — .mxeml, .teml, chained .eml/.beml; stdout captured, not printed
 #
 # Results are written under .results/<operation>/ (except run, which has no
@@ -75,6 +76,17 @@ function Write-SectionHeader {
 function Get-SampleBaseName {
     param([System.IO.FileInfo] $Sample)
     return [System.IO.Path]::GetFileNameWithoutExtension($Sample.Name)
+}
+
+function Get-CsharpExeOutputPath {
+    param(
+        [string] $Directory,
+        [string] $BaseName
+    )
+    if ($env:OS -eq "Windows_NT") {
+        return Join-Path $Directory ($BaseName + ".exe")
+    }
+    return Join-Path $Directory $BaseName
 }
 
 function Pad-Cell {
@@ -526,6 +538,45 @@ function Invoke-ParseSamples {
     return @{ Failed = $(if ($FailCount -gt 0) { 1 } else { 0 }); Ok = $OkCount; Fail = $FailCount }
 }
 
+function Get-DotnetSourceFormats {
+    return @(
+        @{ Of = "csharp"; Ext = ".cs" },
+        @{ Of = "csharplib"; Ext = ".cs" },
+        @{ Of = "fsharp"; Ext = ".fs" },
+        @{ Of = "fsharplib"; Ext = ".fs" },
+        @{ Of = "visualbasic"; Ext = ".vb" },
+        @{ Of = "visualbasiclib"; Ext = ".vb" },
+        @{ Of = "dotil"; Ext = ".il" },
+        @{ Of = "dotillib"; Ext = ".il" }
+    )
+}
+
+function Test-DotnetPresent {
+    return $null -ne (Get-Command dotnet -ErrorAction SilentlyContinue)
+}
+
+function Write-DotnetSourceRows {
+    param(
+        [string] $InputPath,
+        [string] $Base,
+        [string] $InputFormat,
+        [string] $ResultsDir,
+        [string] $Tag,
+        [string] $CliOpts,
+        [ref] $OkCount,
+        [ref] $FailCount
+    )
+
+    foreach ($Fmt in (Get-DotnetSourceFormats)) {
+        $OutPath = Join-Path $ResultsDir ($Base + "." + $Tag + $Fmt.Ext)
+        if ($Fmt.Of -eq "csharplib" -or $Fmt.Of -eq "fsharplib" -or $Fmt.Of -eq "visualbasiclib" -or $Fmt.Of -eq "dotillib") {
+            $OutPath = Join-Path $ResultsDir ($Base + "." + $Tag + ".lib" + $Fmt.Ext)
+        }
+        Write-CompileFormatRow $InputPath $Base $InputFormat $Fmt.Of `
+            $OutPath $CliOpts $OkCount $FailCount
+    }
+}
+
 function Write-CompileFormatRow {
     param(
         [string] $InputPath,
@@ -653,7 +704,7 @@ function Invoke-CompileSamples {
     Start-ResultTable `
         -Samples (Get-AllSampleNames) `
         -Inputs @("mxeml", "teml", "eml", "beml") `
-        -Outputs @("beml", "eml", "js", "c", "clib") `
+        -Outputs @("beml", "eml", "js", "c", "clib", "csharp", "csharplib", "fsharp", "dotil") `
         -OptionsList @($CliOpts, "")
 
     foreach ($Sample in $script:MxemlSamples) {
@@ -669,6 +720,16 @@ function Invoke-CompileSamples {
                 (Join-Path $ResultsDir ($Base + ".c")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
             Write-CompileFormatRow $Sample.FullName $Base "mxeml" "clib" `
                 (Join-Path $ResultsDir ($Base + ".clib.c")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+            Write-DotnetSourceRows $Sample.FullName $Base "mxeml" $ResultsDir "mxeml" `
+                $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+            if (Test-DotnetPresent) {
+                Write-CompileFormatRow $Sample.FullName $Base "mxeml" "csharpdll" `
+                    (Join-Path $ResultsDir ($Base + ".dll")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+                Write-CompileFormatRow $Sample.FullName $Base "mxeml" "csharplibdll" `
+                    (Join-Path $ResultsDir ($Base + ".lib.dll")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+                Write-CompileFormatRow $Sample.FullName $Base "mxeml" "csharpexe" `
+                    (Get-CsharpExeOutputPath $ResultsDir $Base) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+            }
         }
     }
 
@@ -684,6 +745,16 @@ function Invoke-CompileSamples {
             (Join-Path $ResultsDir ($Base + ".c")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
         Write-CompileFormatRow $Sample.FullName $Base "teml" "clib" `
             (Join-Path $ResultsDir ($Base + ".clib.c")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+        Write-DotnetSourceRows $Sample.FullName $Base "teml" $ResultsDir "teml" `
+            $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+        if (Test-DotnetPresent) {
+            Write-CompileFormatRow $Sample.FullName $Base "teml" "csharpdll" `
+                (Join-Path $ResultsDir ($Base + ".teml.dll")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+            Write-CompileFormatRow $Sample.FullName $Base "teml" "csharplibdll" `
+                (Join-Path $ResultsDir ($Base + ".teml.lib.dll")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+            Write-CompileFormatRow $Sample.FullName $Base "teml" "csharpexe" `
+                (Get-CsharpExeOutputPath $ResultsDir ($Base + "-teml")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+        }
     }
 
     $null = Ensure-ChainArtifacts
@@ -699,6 +770,8 @@ function Invoke-CompileSamples {
             (Join-Path $ResultsDir ($Base + ".from_eml.c")) "" ([ref]$OkCount) ([ref]$FailCount)
         Write-CompileFormatRow $File.FullName $Base "eml" "clib" `
             (Join-Path $ResultsDir ($Base + ".from_eml.clib.c")) "" ([ref]$OkCount) ([ref]$FailCount)
+        Write-DotnetSourceRows $File.FullName $Base "eml" $ResultsDir "from_eml" `
+            "" ([ref]$OkCount) ([ref]$FailCount)
     }
 
     $BemlFiles = @(Get-ChildItem -LiteralPath $script:ChainDir -Filter "*.beml" | Sort-Object Name)
@@ -712,6 +785,8 @@ function Invoke-CompileSamples {
             (Join-Path $ResultsDir ($Base + ".from_beml.c")) "" ([ref]$OkCount) ([ref]$FailCount)
         Write-CompileFormatRow $File.FullName $Base "beml" "clib" `
             (Join-Path $ResultsDir ($Base + ".from_beml.clib.c")) "" ([ref]$OkCount) ([ref]$FailCount)
+        Write-DotnetSourceRows $File.FullName $Base "beml" $ResultsDir "from_beml" `
+            "" ([ref]$OkCount) ([ref]$FailCount)
     }
 
     $Total = $OkCount + $FailCount

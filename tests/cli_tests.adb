@@ -8,12 +8,14 @@ with Ada.Text_IO;
 
 with Eml.CLI;
 with Eml.Info;
+with Dotnet_Build;
 
 package body CLI_Tests is
 
    use Ada.Streams;
    use Ada.Strings.Unbounded;
    use type Ada.Command_Line.Exit_Status;
+   use type Ada.Directories.File_Size;
 
    procedure Run (Failed : in out Boolean) is
 
@@ -2199,6 +2201,596 @@ package body CLI_Tests is
       begin
          Require
            (Status = Ada.Command_Line.Failure, "cli-run-fn: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_compile_csharp.mxeml", "e");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("csharp")];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Success,
+            "cli-csharp-stdout: exit");
+      end;
+
+      declare
+         In_Path  : constant String :=
+           Write_Temp ("cli_compile_csharp_o.mxeml", "e");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_csharp_o.cs");
+         Proj_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_csharp_o.csproj");
+         Args     : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("csharp"),
+            A ("-o"),
+            A (Out_Path)];
+         Status   : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+         Cs_Text  : constant String := Read_All (Out_Path);
+         Proj_Text : constant String := Read_All (Proj_Path);
+      begin
+         Require
+           (Status = Ada.Command_Line.Success,
+            "cli-compile-csharp-o: exit");
+         Require
+           (Ada.Strings.Fixed.Index (Cs_Text, "public static Complex eml") > 0,
+            "cli-compile-csharp-o: eml");
+         Require
+           (Ada.Strings.Fixed.Index (Proj_Text, "<Project") > 0,
+            "cli-compile-csharp-o: csproj");
+      end;
+
+      declare
+         In_Path  : constant String :=
+           Write_Temp ("cli_compile_csharp_nc.mxeml", "e");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_csharp_nc.cs");
+         Proj_Path : constant String :=
+           Ada.Directories.Compose
+             (Temp_Dir, "cli_compile_csharp_nc.csproj");
+         Args     : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("csharp"),
+            A ("-o"),
+            A (Out_Path),
+            A ("--no-companion-project")];
+         Status   : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Success,
+            "cli-compile-csharp-nc: exit");
+         Require
+           (not Ada.Directories.Exists (Proj_Path),
+            "cli-compile-csharp-nc: no csproj");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_compile_csharp_tfm.mxeml", "1");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("csharp"),
+            A ("--framework"),
+            A ("netstandard2.1")];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure,
+            "cli-compile-csharp-bad-tfm: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_compile_cli.mxeml", "1");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("cli")];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure, "cli-compile-cli: exit");
+      end;
+
+      declare
+         In_Path  : constant String :=
+           Write_Temp ("cli_compile_csharplib.mxeml", "e");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_csharplib.cs");
+         Args     : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("csharplib"),
+            A ("-fn"),
+            A ("Eval"),
+            A ("-o"),
+            A (Out_Path)];
+         Status   : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+         Text     : constant String := Read_All (Out_Path);
+      begin
+         Require
+           (Status = Ada.Command_Line.Success,
+            "cli-compile-csharplib: exit");
+         Require
+           (Ada.Strings.Fixed.Index (Text, "public static Complex Eval()") > 0,
+            "cli-compile-csharplib: eval");
+         Require
+           (Ada.Strings.Fixed.Index (Text, "Main") = 0,
+            "cli-compile-csharplib: no main");
+      end;
+
+      declare
+         In_Path  : constant String :=
+           Write_Temp ("cli_compile_net10.mxeml", "e");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_net10.cs");
+         Proj_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_net10.csproj");
+         Args     : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("csharp"),
+            A ("--framework"),
+            A ("net10.0"),
+            A ("-o"),
+            A (Out_Path)];
+         Status   : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+         Proj     : constant String := Read_All (Proj_Path);
+      begin
+         Require
+           (Status = Ada.Command_Line.Success,
+            "cli-compile-net10: exit");
+         Require
+           (Ada.Strings.Fixed.Index (Proj, "net10.0") > 0,
+            "cli-compile-net10: tfm");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_compile_js_fw.mxeml", "1");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("js"),
+            A ("--framework"),
+            A ("net8.0")];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure,
+            "cli-compile-js-framework: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_compile_c_nc.mxeml", "1");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("c"),
+            A ("--no-companion-project")];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure,
+            "cli-compile-c-no-companion: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_compile_csharpdll_no.mxeml", "e");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("csharpdll")];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure,
+            "cli-compile-csharpdll-no-o: exit");
+      end;
+
+      declare
+         In_Path  : constant String :=
+           Write_Temp ("cli_compile_csharpdll_ext.mxeml", "e");
+         Out_Path : constant String :=
+           Ada.Directories.Compose
+             (Temp_Dir, "cli_compile_csharpdll_ext.exe");
+         Args     : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("csharpdll"),
+            A ("-o"),
+            A (Out_Path)];
+         Status   : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure,
+            "cli-compile-csharpdll-ext: exit");
+      end;
+
+      declare
+         In_Path  : constant String :=
+           Write_Temp ("cli_compile_csharplibdll_ext.mxeml", "e");
+         Out_Path : constant String :=
+           Ada.Directories.Compose
+             (Temp_Dir, "cli_compile_csharplibdll_ext.exe");
+         Args     : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("csharplibdll"),
+            A ("-o"),
+            A (Out_Path)];
+         Status   : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure,
+            "cli-compile-csharplibdll-ext: exit");
+      end;
+
+      declare
+         In_Path  : constant String :=
+           Write_Temp ("cli_compile_csharpexe_ext.mxeml", "e");
+         Out_Name : constant String :=
+           (if Dotnet_Build.Host_Is_Windows
+            then "cli_compile_csharpexe_ext"
+            else "cli_compile_csharpexe_ext.exe");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, Out_Name);
+         Args     : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("csharpexe"),
+            A ("-o"),
+            A (Out_Path)];
+         Status   : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure,
+            "cli-compile-csharpexe-ext: exit");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_compile_csharpdll_nc.mxeml", "e");
+         Out_Path : constant String :=
+           Ada.Directories.Compose
+             (Temp_Dir, "cli_compile_csharpdll_nc.dll");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("csharpdll"),
+            A ("-o"),
+            A (Out_Path),
+            A ("--no-companion-project")];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure,
+            "cli-compile-csharpdll-nc: exit");
+      end;
+
+      if Dotnet_Build.Dotnet_On_Path then
+         declare
+            In_Path  : constant String :=
+              Write_Temp ("cli_compile_csharpdll_ok.mxeml", "e");
+            Out_Path : constant String :=
+              Ada.Directories.Compose
+                (Temp_Dir, "cli_compile_csharpdll_ok.dll");
+            Args     : constant Eml.CLI.Arg_Array :=
+              [A ("--no-logo"),
+               A ("compile"),
+               A ("-i"),
+               A (In_Path),
+               A ("-of"),
+               A ("csharpdll"),
+               A ("-o"),
+               A (Out_Path)];
+            Status   : constant Ada.Command_Line.Exit_Status :=
+              Eml.CLI.Run (Args);
+         begin
+            Require
+              (Status = Ada.Command_Line.Success,
+               "cli-compile-csharpdll: exit");
+            Require
+              (Ada.Directories.Exists (Out_Path)
+               and then Ada.Directories.Size (Out_Path) > 0,
+               "cli-compile-csharpdll: dll");
+         end;
+
+         declare
+            In_Path  : constant String :=
+              Write_Temp ("cli_compile_csharplibdll_ok.mxeml", "e");
+            Out_Path : constant String :=
+              Ada.Directories.Compose
+                (Temp_Dir, "cli_compile_csharplibdll_ok.dll");
+            Args     : constant Eml.CLI.Arg_Array :=
+              [A ("--no-logo"),
+               A ("compile"),
+               A ("-i"),
+               A (In_Path),
+               A ("-of"),
+               A ("csharplibdll"),
+               A ("-o"),
+               A (Out_Path)];
+            Status   : constant Ada.Command_Line.Exit_Status :=
+              Eml.CLI.Run (Args);
+         begin
+            Require
+              (Status = Ada.Command_Line.Success,
+               "cli-compile-csharplibdll: exit");
+            Require
+              (Ada.Directories.Exists (Out_Path)
+               and then Ada.Directories.Size (Out_Path) > 0,
+               "cli-compile-csharplibdll: dll");
+         end;
+
+         declare
+            In_Path  : constant String :=
+              Write_Temp ("cli_compile_csharpexe_ok.mxeml", "e");
+            Out_Name : constant String :=
+              (if Dotnet_Build.Host_Is_Windows
+               then "cli_compile_csharpexe_ok.exe"
+               else "cli_compile_csharpexe_ok");
+            Out_Path : constant String :=
+              Ada.Directories.Compose (Temp_Dir, Out_Name);
+            Args     : constant Eml.CLI.Arg_Array :=
+              [A ("--no-logo"),
+               A ("compile"),
+               A ("-i"),
+               A (In_Path),
+               A ("-of"),
+               A ("csharpexe"),
+               A ("-o"),
+               A (Out_Path)];
+            Status   : constant Ada.Command_Line.Exit_Status :=
+              Eml.CLI.Run (Args);
+            Magic    : String (1 .. 2) := "  ";
+         begin
+            Require
+              (Status = Ada.Command_Line.Success,
+               "cli-compile-csharpexe: exit");
+            Require
+              (Ada.Directories.Exists (Out_Path)
+               and then Ada.Directories.Size (Out_Path) > 0,
+               "cli-compile-csharpexe: exe");
+            if Ada.Directories.Exists (Out_Path)
+              and then Ada.Directories.Size (Out_Path) >= 2
+            then
+               declare
+                  File : Ada.Streams.Stream_IO.File_Type;
+                  Buf  : Stream_Element_Array (1 .. 2);
+                  Last : Stream_Element_Offset;
+               begin
+                  Ada.Streams.Stream_IO.Open
+                    (File, Ada.Streams.Stream_IO.In_File, Out_Path);
+                  Ada.Streams.Stream_IO.Read (File, Buf, Last);
+                  Ada.Streams.Stream_IO.Close (File);
+                  if Last >= Buf'Last then
+                     Magic (1) := Character'Val (Natural (Buf (1)));
+                     Magic (2) := Character'Val (Natural (Buf (2)));
+                  end if;
+               end;
+            end if;
+            if Dotnet_Build.Host_Is_Windows then
+               Require
+                 (Magic = "MZ",
+                  "cli-compile-csharpexe: windows pe");
+            else
+               Require
+                 (Magic /= "MZ",
+                  "cli-compile-csharpexe: not windows pe");
+            end if;
+         end;
+      end if;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_compile_fsharp.mxeml", "e");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_fsharp.fs");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("fsharp"),
+            A ("-o"),
+            A (Out_Path)];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+         Text    : constant String := Read_All (Out_Path);
+      begin
+         Require
+           (Status = Ada.Command_Line.Success, "cli-compile-fsharp: exit");
+         Require
+           (Ada.Strings.Fixed.Index (Text, "module Eml") > 0,
+            "cli-compile-fsharp: module");
+      end;
+
+      declare
+         In_Path  : constant String :=
+           Write_Temp ("cli_compile_fslib.mxeml", "e");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_fslib.fs");
+         Proj_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_fslib.fsproj");
+         Args     : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("fsharplib"),
+            A ("--framework"),
+            A ("netstandard2.0"),
+            A ("-o"),
+            A (Out_Path)];
+         Status   : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+         Proj     : constant String := Read_All (Proj_Path);
+      begin
+         Require
+           (Status = Ada.Command_Line.Success,
+            "cli-compile-fsharplib: exit");
+         Require
+           (Ada.Strings.Fixed.Index (Proj, "netstandard2.0") > 0,
+            "cli-compile-fsharplib: tfm");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_compile_vb.mxeml", "e");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_vb.vb");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("visualbasic"),
+            A ("-o"),
+            A (Out_Path)];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+         Text    : constant String := Read_All (Out_Path);
+      begin
+         Require
+           (Status = Ada.Command_Line.Success, "cli-compile-vb: exit");
+         Require
+           (Ada.Strings.Fixed.Index (Text, "Module EmlModule") > 0,
+            "cli-compile-vb: module");
+      end;
+
+      declare
+         In_Path  : constant String :=
+           Write_Temp ("cli_compile_cs_unbound.mxeml", "$X");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_cs_unbound.cs");
+         Proj_Path : constant String :=
+           Ada.Directories.Compose
+             (Temp_Dir, "cli_compile_cs_unbound.csproj");
+         Args     : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("csharp"),
+            A ("-o"),
+            A (Out_Path)];
+         Status   : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure,
+            "cli-compile-csharp-unbound: exit");
+         Require
+           (not Ada.Directories.Exists (Out_Path),
+            "cli-compile-csharp-unbound: no cs");
+         Require
+           (not Ada.Directories.Exists (Proj_Path),
+            "cli-compile-csharp-unbound: no csproj");
+      end;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_compile_dotil.mxeml", "e");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, "cli_compile_dotil.il");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("dotil"),
+            A ("-o"),
+            A (Out_Path)];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+         Text    : constant String := Read_All (Out_Path);
+      begin
+         Require
+           (Status = Ada.Command_Line.Success, "cli-compile-dotil: exit");
+         Require
+           (Ada.Strings.Fixed.Index (Text, ".entrypoint") > 0,
+            "cli-compile-dotil: entry");
       end;
    end Run;
 

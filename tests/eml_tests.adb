@@ -16,6 +16,10 @@ with Interpreter_Tests;
 with IR_Eml_Tests;
 with Js_Backend_Tests;
 with C_Backend_Tests;
+with Dotnet_Backend_Tests;
+with Fsharp_Backend_Tests;
+with Vb_Backend_Tests;
+with Il_Backend_Tests;
 with Regex_Automata_Tests;
 
 procedure Eml_Tests is
@@ -32,6 +36,10 @@ begin
    Interpreter_Tests.Run (Failed);
    Js_Backend_Tests.Run (Failed);
    C_Backend_Tests.Run (Failed);
+   Dotnet_Backend_Tests.Run (Failed);
+   Fsharp_Backend_Tests.Run (Failed);
+   Vb_Backend_Tests.Run (Failed);
+   Il_Backend_Tests.Run (Failed);
    CLI_Tests.Run (Failed);
    Teml_Tokenizer_Tests.Run (Failed);
    Eml_Tokenizer_Tests.Run (Failed);

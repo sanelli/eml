@@ -18,6 +18,11 @@ with Interpreter;
 with IR_Eml;
 with Js_Backend;
 with C_Backend;
+with Dotnet_Backend;
+with Dotnet_Build;
+with Fsharp_Backend;
+with Vb_Backend;
+with Il_Backend;
 
 use type Interpreter.Eval_Status;
 with Teml_Parser;
@@ -41,11 +46,158 @@ package body Eml.CLI is
    type Input_Format is (Mxeml, Teml, Stack_Eml, Beml);
 
    type Compile_Output_Format is
-     (Eml_Text, Beml_Binary, Javascript, C_Program, C_Lib);
+     (Eml_Text,
+      Beml_Binary,
+      Javascript,
+      C_Program,
+      C_Lib,
+      CSharp,
+      CSharp_Lib,
+      CSharp_Dll,
+      CSharp_Lib_Dll,
+      CSharp_Exe,
+      FSharp,
+      FSharp_Lib,
+      Visual_Basic,
+      Visual_Basic_Lib,
+      Dot_Il,
+      Dot_Il_Lib);
 
    type Binding_List is array (Positive range <>) of Expr_Preprocessor.Binding;
 
    Empty_Stream : constant Ada.Streams.Stream_Element_Array (1 .. 0) := [];
+
+   Compile_Of_List : constant String :=
+     "eml|beml|js|c|clib|csharp|csharplib|csharpdll|"
+     & "csharplibdll|csharpexe|fsharp|fsharplib|"
+     & "visualbasic|visualbasiclib|dotil|dotillib";
+
+   function Equals_Ignore_Case (A, B : String) return Boolean is
+   begin
+      if A'Length /= B'Length then
+         return False;
+      end if;
+      for I in A'Range loop
+         if Ada.Characters.Handling.To_Lower (A (I))
+           /= Ada.Characters.Handling.To_Lower (B (I))
+         then
+            return False;
+         end if;
+      end loop;
+      return True;
+   end Equals_Ignore_Case;
+
+   function Valid_Net_Version_Tfm (S : String) return Boolean is
+   begin
+      if S'Length < 5 then
+         return False;
+      end if;
+      if S (S'First .. S'First + 2) /= "net" then
+         return False;
+      end if;
+      if S (S'Last - 1 .. S'Last) /= ".0" then
+         return False;
+      end if;
+      for I in S'First + 3 .. S'Last - 2 loop
+         if S (I) not in '0' .. '9' then
+            return False;
+         end if;
+      end loop;
+      return S'Last - 2 >= S'First + 3;
+   end Valid_Net_Version_Tfm;
+
+   function Valid_Library_Tfm (S : String) return Boolean is
+   begin
+      return Valid_Net_Version_Tfm (S)
+        or else S = "netstandard2.0"
+        or else S = "netstandard2.1";
+   end Valid_Library_Tfm;
+
+   function Valid_Program_Tfm (S : String) return Boolean is
+   begin
+      return Valid_Net_Version_Tfm (S);
+   end Valid_Program_Tfm;
+
+   function Compile_Fmt_Is_Library (Fmt : Compile_Output_Format) return Boolean
+   is
+   begin
+      case Fmt is
+         when CSharp_Lib | CSharp_Lib_Dll | FSharp_Lib | Visual_Basic_Lib
+           | Dot_Il_Lib =>
+            return True;
+         when others =>
+            return False;
+      end case;
+   end Compile_Fmt_Is_Library;
+
+   function Compile_Fmt_Requires_Dotnet (Fmt : Compile_Output_Format)
+      return Boolean
+   is
+   begin
+      return Fmt = CSharp_Dll
+        or else Fmt = CSharp_Lib_Dll
+        or else Fmt = CSharp_Exe;
+   end Compile_Fmt_Requires_Dotnet;
+
+   function Compile_Fmt_Allows_Framework (Fmt : Compile_Output_Format)
+      return Boolean
+   is
+   begin
+      case Fmt is
+         when CSharp | CSharp_Lib | CSharp_Dll | CSharp_Lib_Dll
+           | CSharp_Exe | FSharp | FSharp_Lib | Visual_Basic
+           | Visual_Basic_Lib | Dot_Il | Dot_Il_Lib =>
+            return True;
+         when others =>
+            return False;
+      end case;
+   end Compile_Fmt_Allows_Framework;
+
+   function Compile_Fmt_Allows_No_Companion (Fmt : Compile_Output_Format)
+      return Boolean
+   is
+   begin
+      case Fmt is
+         when CSharp | CSharp_Lib | FSharp | FSharp_Lib | Visual_Basic
+           | Visual_Basic_Lib =>
+            return True;
+         when others =>
+            return False;
+      end case;
+   end Compile_Fmt_Allows_No_Companion;
+
+   function Compile_Fmt_Allows_Function_Name (Fmt : Compile_Output_Format)
+      return Boolean
+   is
+   begin
+      case Fmt is
+         when Javascript | C_Lib | CSharp | CSharp_Lib | CSharp_Dll
+           | CSharp_Lib_Dll | CSharp_Exe | FSharp | FSharp_Lib
+           | Visual_Basic | Visual_Basic_Lib | Dot_Il | Dot_Il_Lib =>
+            return True;
+         when others =>
+            return False;
+      end case;
+   end Compile_Fmt_Allows_Function_Name;
+
+   function Reserved_Function_Name (S : String) return Boolean is
+   begin
+      return Equals_Ignore_Case (S, "eml")
+        or else Equals_Ignore_Case (S, "Main");
+   end Reserved_Function_Name;
+
+   function Default_Function_Name
+     (Fmt : Compile_Output_Format) return String is
+   begin
+      case Fmt is
+         when Javascript =>
+            return Js_Backend.Default_Function_Name;
+         when C_Lib =>
+            return C_Backend.Default_Lib_Function_Name;
+         when others =>
+            return Dotnet_Backend.Default_Function_Name;
+      end case;
+   end Default_Function_Name;
 
    function Ends_With (S, Suffix : String) return Boolean is
    begin
@@ -121,8 +273,9 @@ package body Eml.CLI is
       Emit_Error_Line
         ("  eml compile "
          & Common_Options
-         & " [--output-format|-of eml|beml|js|c|clib]"
-         & " [--function-name|-fn NAME] [--emit-eml]",
+         & " [--output-format|-of " & Compile_Of_List & "]"
+         & " [--function-name|-fn NAME] [--framework TFM]"
+         & " [--no-companion-project] [--emit-eml]",
          Use_Color);
       Emit_Error_Line
         ("  eml run "
@@ -158,7 +311,8 @@ package body Eml.CLI is
       Put_Stdout ("  tokenize   Dump the token stream of a source file");
       Put_Stdout ("  parse      Dump the syntax tree of a source file");
       Put_Stdout
-        ("  compile    Lower to .beml, .eml, .js, .c, or clib (.c+.h)");
+        ("  compile    Lower to .beml, .eml, .js, .c, clib, "
+         & "or .NET outputs");
       Put_Stdout
         ("  run        Evaluate IR EML and print a complex result");
       Put_Stdout ("");
@@ -322,8 +476,9 @@ package body Eml.CLI is
       Put_Stdout
         ("  eml compile "
          & Common_Options
-         & " [--output-format|-of eml|beml|js|c|clib]"
-         & " [--function-name|-fn NAME] [--emit-eml]");
+         & " [--output-format|-of " & Compile_Of_List & "]"
+         & " [--function-name|-fn NAME] [--framework TFM]"
+         & " [--no-companion-project] [--emit-eml]");
       Put_Stdout ("");
       Put_Stdout ("Options:");
       Put_Stdout
@@ -334,10 +489,15 @@ package body Eml.CLI is
         ("  --output, -o <file>         Optional output; stdout if omitted");
       Put_Stdout
         ("  --output-format, -of FMT    beml (default), eml, js, c, "
-         & "or clib");
+         & "clib, or .NET formats");
       Put_Stdout
-        ("  --function-name, -fn NAME   Entry function for -of js "
-         & "(default main) or clib (default compute)");
+        ("  --function-name, -fn NAME   Entry for js (main), clib "
+         & "(compute), or .NET (Compute)");
+      Put_Stdout
+        ("  --framework TFM             Target framework (default net8.0)");
+      Put_Stdout
+        ("  --no-companion-project      Skip .csproj/.fsproj/.vbproj "
+         & "when -o is set");
       Put_Stdout
         ("  --emit-eml                  With -of clib, declare eml "
          & "in the companion .h");
@@ -352,38 +512,43 @@ package body Eml.CLI is
       Put_Stdout ("  c    -> .c (standalone program with main)");
       Put_Stdout
         ("  clib -> .c (writes companion .h; compute by default)");
+      Put_Stdout ("  csharp/csharplib -> .cs (+ .csproj when -o)");
+      Put_Stdout
+        ("  csharpdll/csharplibdll -> .dll (requires -o; "
+         & "dotnet build)");
+      Put_Stdout
+        ("  csharpexe -> .exe on Windows, no extension on "
+         & "Linux/macOS");
+      Put_Stdout
+        ("               (requires -o; publishes for this OS)");
+      Put_Stdout ("  fsharp/fsharplib -> .fs (+ .fsproj when -o)");
+      Put_Stdout ("  visualbasic/visualbasiclib -> .vb (+ .vbproj when -o)");
+      Put_Stdout ("  dotil/dotillib -> .il");
       Put_Stdout ("");
       Put_Stdout
         ("Compiling eml to eml or beml to beml is rejected "
          & "(use conversion instead).");
       Put_Stdout
-        ("-of js emits browser JavaScript (math.js) and, "
-         & "when -o is set, a companion .html that loads "
-         & "the script and shows the entry function.");
+        ("Without -o, .NET source formats write source only to stdout "
+         & "(no companion project).");
       Put_Stdout
-        ("Without -o, only the JavaScript goes to stdout "
-         & "(no HTML).");
-      Put_Stdout
-        ("-of c emits a C program using <complex.h> "
-         & "(long double complex).");
-      Put_Stdout
-        ("-of clib emits a C library .c; with -o also writes "
-         & "a companion .h (entry function; eml only with "
-         & "--emit-eml).");
-      Put_Stdout
-        ("Without -o, only the clib .c goes to stdout (no .h).");
+        ("csharpdll, csharplibdll, and csharpexe require -o "
+         & "and the dotnet SDK.");
       Put_Stdout ("");
       Put_Stdout ("Examples:");
       Put_Stdout ("  eml compile -i filename.mxeml -o other.beml");
-      Put_Stdout ("  eml compile -i f.eml -of beml -o out.beml");
-      Put_Stdout ("  eml --no-logo compile -if mxeml < in.mxeml -of eml");
-      Put_Stdout ("  eml compile -i f.mxeml -of js -o out.js");
-      Put_Stdout ("  eml compile -i f.mxeml -of js -fn run -o out.js");
-      Put_Stdout ("  eml compile -i f.mxeml -of c -o out.c");
-      Put_Stdout ("  eml compile -i f.mxeml -of clib -o out.c");
+      Put_Stdout ("  eml compile -i f.mxeml -of csharp -o out.cs");
+      Put_Stdout ("  eml compile -i f.mxeml -of csharplib -fn Eval -o out.cs");
       Put_Stdout
-        ("  eml compile -i f.mxeml -of clib -fn eval --emit-eml "
-         & "-o out.c");
+        ("  eml compile -i f.mxeml -of csharpdll -o out.dll");
+      Put_Stdout
+        ("  eml compile -i f.mxeml -of csharpexe -o out.exe  "
+         & "(Windows)");
+      Put_Stdout
+        ("  eml compile -i f.mxeml -of csharpexe -o out  "
+         & "(Linux/macOS)");
+      Put_Stdout ("  eml compile -i f.mxeml -of fsharp -o out.fs");
+      Put_Stdout ("  eml compile -i f.mxeml -of dotil -o out.il");
    end Put_Compile_Help;
 
    procedure Put_Run_Help is
@@ -736,6 +901,28 @@ package body Eml.CLI is
          return C_Program;
       elsif S = "clib" then
          return C_Lib;
+      elsif S = "csharp" then
+         return CSharp;
+      elsif S = "csharplib" then
+         return CSharp_Lib;
+      elsif S = "csharpdll" then
+         return CSharp_Dll;
+      elsif S = "csharplibdll" then
+         return CSharp_Lib_Dll;
+      elsif S = "csharpexe" then
+         return CSharp_Exe;
+      elsif S = "fsharp" then
+         return FSharp;
+      elsif S = "fsharplib" then
+         return FSharp_Lib;
+      elsif S = "visualbasic" then
+         return Visual_Basic;
+      elsif S = "visualbasiclib" then
+         return Visual_Basic_Lib;
+      elsif S = "dotil" then
+         return Dot_Il;
+      elsif S = "dotillib" then
+         return Dot_Il_Lib;
       else
          Ok := False;
          return Beml_Binary;
@@ -745,21 +932,43 @@ package body Eml.CLI is
    function Compile_Extension (Fmt : Compile_Output_Format) return String is
    begin
       case Fmt is
-         when Eml_Text    => return ".eml";
-         when Beml_Binary => return ".beml";
-         when Javascript  => return ".js";
+         when Eml_Text       => return ".eml";
+         when Beml_Binary    => return ".beml";
+         when Javascript     => return ".js";
          when C_Program | C_Lib => return ".c";
+         when CSharp | CSharp_Lib => return ".cs";
+         when CSharp_Dll | CSharp_Lib_Dll => return ".dll";
+         when CSharp_Exe =>
+            if Dotnet_Build.Host_Is_Windows then
+               return ".exe";
+            else
+               return "";
+            end if;
+         when FSharp | FSharp_Lib => return ".fs";
+         when Visual_Basic | Visual_Basic_Lib => return ".vb";
+         when Dot_Il | Dot_Il_Lib => return ".il";
       end case;
    end Compile_Extension;
 
    function Compile_Format_Image (Fmt : Compile_Output_Format) return String is
    begin
       case Fmt is
-         when Eml_Text    => return "eml";
-         when Beml_Binary => return "beml";
-         when Javascript  => return "js";
-         when C_Program   => return "c";
-         when C_Lib       => return "clib";
+         when Eml_Text       => return "eml";
+         when Beml_Binary    => return "beml";
+         when Javascript     => return "js";
+         when C_Program      => return "c";
+         when C_Lib          => return "clib";
+         when CSharp         => return "csharp";
+         when CSharp_Lib     => return "csharplib";
+         when CSharp_Dll     => return "csharpdll";
+         when CSharp_Lib_Dll => return "csharplibdll";
+         when CSharp_Exe     => return "csharpexe";
+         when FSharp         => return "fsharp";
+         when FSharp_Lib     => return "fsharplib";
+         when Visual_Basic   => return "visualbasic";
+         when Visual_Basic_Lib => return "visualbasiclib";
+         when Dot_Il         => return "dotil";
+         when Dot_Il_Lib     => return "dotillib";
       end case;
    end Compile_Format_Image;
 
@@ -1308,14 +1517,22 @@ package body Eml.CLI is
    end Valid_Function_Name;
 
    procedure Write_Compile_Output
-     (IR            : IR_Eml.Node_Access;
-      Meta          : IR_Eml.Dump_Meta;
-      Output_Path   : String;
-      Has_Output    : Boolean;
-      Fmt           : Compile_Output_Format;
-      Function_Name : String;
-      Emit_Eml      : Boolean)
+     (IR                   : IR_Eml.Node_Access;
+      Meta                 : IR_Eml.Dump_Meta;
+      Output_Path          : String;
+      Has_Output           : Boolean;
+      Fmt                  : Compile_Output_Format;
+      Function_Name        : String;
+      Emit_Eml             : Boolean;
+      Target_Framework     : String;
+      No_Companion_Project : Boolean)
    is
+      Fn : constant String :=
+        (if Function_Name'Length = 0
+         then Default_Function_Name (Fmt)
+         else Function_Name);
+      Write_Proj : constant Boolean :=
+        Has_Output and then not No_Companion_Project;
    begin
       case Fmt is
          when Eml_Text =>
@@ -1331,20 +1548,13 @@ package body Eml.CLI is
                IR_Eml.Write_Beml_To_Stdout (IR, Meta);
             end if;
          when Javascript =>
-            declare
-               Fn : constant String :=
-                 (if Function_Name'Length = 0
-                  then Js_Backend.Default_Function_Name
-                  else Function_Name);
-            begin
-               if Has_Output then
-                  Js_Backend.Write_Js_To_File
-                    (IR, Meta, Output_Path, Fn);
-                  Js_Backend.Write_Html_To_File (Output_Path, Fn);
-               else
-                  Js_Backend.Write_Js_To_Stdout (IR, Meta, Fn);
-               end if;
-            end;
+            if Has_Output then
+               Js_Backend.Write_Js_To_File
+                 (IR, Meta, Output_Path, Fn);
+               Js_Backend.Write_Html_To_File (Output_Path, Fn);
+            else
+               Js_Backend.Write_Js_To_Stdout (IR, Meta, Fn);
+            end if;
          when C_Program =>
             if Has_Output then
                C_Backend.Write_C_Program_To_File
@@ -1353,20 +1563,79 @@ package body Eml.CLI is
                C_Backend.Write_C_Program_To_Stdout (IR, Meta);
             end if;
          when C_Lib =>
-            declare
-               Fn : constant String :=
-                 (if Function_Name'Length = 0
-                  then C_Backend.Default_Lib_Function_Name
-                  else Function_Name);
-            begin
-               if Has_Output then
-                  C_Backend.Write_C_Lib_To_File
-                    (IR, Meta, Output_Path, Fn, Emit_Eml);
-               else
-                  C_Backend.Write_C_Lib_To_Stdout
-                    (IR, Meta, Fn, Emit_Eml);
-               end if;
-            end;
+            if Has_Output then
+               C_Backend.Write_C_Lib_To_File
+                 (IR, Meta, Output_Path, Fn, Emit_Eml);
+            else
+               C_Backend.Write_C_Lib_To_Stdout
+                 (IR, Meta, Fn, Emit_Eml);
+            end if;
+         when CSharp =>
+            if Has_Output then
+               Dotnet_Backend.Write_CSharp_Program_To_File
+                 (IR, Meta, Output_Path, Fn, Target_Framework, Write_Proj);
+            else
+               Dotnet_Backend.Write_CSharp_Program_To_Stdout
+                 (IR, Meta, Fn);
+            end if;
+         when CSharp_Lib =>
+            if Has_Output then
+               Dotnet_Backend.Write_CSharp_Lib_To_File
+                 (IR, Meta, Output_Path, Fn, Target_Framework, Write_Proj);
+            else
+               Dotnet_Backend.Write_CSharp_Lib_To_Stdout
+                 (IR, Meta, Fn);
+            end if;
+         when CSharp_Dll | CSharp_Lib_Dll | CSharp_Exe =>
+            null;
+         when FSharp =>
+            if Has_Output then
+               Fsharp_Backend.Write_FSharp_Program_To_File
+                 (IR, Meta, Output_Path, Fn, Target_Framework, Write_Proj);
+            else
+               Fsharp_Backend.Write_FSharp_Program_To_Stdout
+                 (IR, Meta, Fn);
+            end if;
+         when FSharp_Lib =>
+            if Has_Output then
+               Fsharp_Backend.Write_FSharp_Lib_To_File
+                 (IR, Meta, Output_Path, Fn, Target_Framework, Write_Proj);
+            else
+               Fsharp_Backend.Write_FSharp_Lib_To_Stdout
+                 (IR, Meta, Fn);
+            end if;
+         when Visual_Basic =>
+            if Has_Output then
+               Vb_Backend.Write_Vb_Program_To_File
+                 (IR, Meta, Output_Path, Fn, Target_Framework, Write_Proj);
+            else
+               Vb_Backend.Write_Vb_Program_To_Stdout
+                 (IR, Meta, Fn);
+            end if;
+         when Visual_Basic_Lib =>
+            if Has_Output then
+               Vb_Backend.Write_Vb_Lib_To_File
+                 (IR, Meta, Output_Path, Fn, Target_Framework, Write_Proj);
+            else
+               Vb_Backend.Write_Vb_Lib_To_Stdout
+                 (IR, Meta, Fn);
+            end if;
+         when Dot_Il =>
+            if Has_Output then
+               Il_Backend.Write_Il_Program_To_File
+                 (IR, Meta, Output_Path, Fn, Target_Framework);
+            else
+               Il_Backend.Write_Il_Program_To_Stdout
+                 (IR, Meta, Fn, Target_Framework);
+            end if;
+         when Dot_Il_Lib =>
+            if Has_Output then
+               Il_Backend.Write_Il_Lib_To_File
+                 (IR, Meta, Output_Path, Fn, Target_Framework);
+            else
+               Il_Backend.Write_Il_Lib_To_Stdout
+                 (IR, Meta, Fn, Target_Framework);
+            end if;
       end case;
    end Write_Compile_Output;
 
@@ -1507,18 +1776,20 @@ package body Eml.CLI is
    end Load_IR;
 
    function Run_Emlir
-     (Source_Label  : String;
-      In_Fmt        : Input_Format;
-      Source        : String;
-      Bin_Data      : Ada.Streams.Stream_Element_Array;
-      Output_Path   : String;
-      Has_Output    : Boolean;
-      Fmt           : Compile_Output_Format;
-      Bindings      : Binding_Array;
-      Warn          : Warn_Mode;
-      Use_Color     : Boolean;
-      Function_Name : String;
-      Emit_Eml      : Boolean) return Ada.Command_Line.Exit_Status
+     (Source_Label         : String;
+      In_Fmt               : Input_Format;
+      Source               : String;
+      Bin_Data             : Ada.Streams.Stream_Element_Array;
+      Output_Path          : String;
+      Has_Output           : Boolean;
+      Fmt                  : Compile_Output_Format;
+      Bindings             : Binding_Array;
+      Warn                 : Warn_Mode;
+      Use_Color            : Boolean;
+      Function_Name        : String;
+      Emit_Eml             : Boolean;
+      Target_Framework     : String;
+      No_Companion_Project : Boolean) return Ada.Command_Line.Exit_Status
    is
       Meta : constant IR_Eml.Dump_Meta :=
         (Source_Path => To_Unbounded_String (Source_Label),
@@ -1526,12 +1797,59 @@ package body Eml.CLI is
          Compiled_At => Ada.Calendar.Clock);
       Root   : IR_Eml.Node_Access;
       Status : Ada.Command_Line.Exit_Status;
+      Fn     : constant String :=
+        (if Function_Name'Length = 0
+         then Default_Function_Name (Fmt)
+         else Function_Name);
    begin
       Status :=
         Load_IR (In_Fmt, Source, Bin_Data, Bindings, Warn, Use_Color, Root);
       if Status /= Ada.Command_Line.Success then
          return Status;
       end if;
+
+      if Compile_Fmt_Requires_Dotnet (Fmt) then
+         if not Dotnet_Build.Dotnet_On_Path then
+            Fail_CLI (CLI_Dotnet_Not_Found, Use_Color);
+            return Ada.Command_Line.Failure;
+         end if;
+         declare
+            Build_R : Dotnet_Build.Build_Result;
+         begin
+            case Fmt is
+               when CSharp_Dll =>
+                  Build_R :=
+                    Dotnet_Build.Build_Csharp_Dll
+                      (Root, Meta, Output_Path, Fn, Target_Framework);
+               when CSharp_Lib_Dll =>
+                  Build_R :=
+                    Dotnet_Build.Build_Csharp_Lib_Dll
+                      (Root, Meta, Output_Path, Fn, Target_Framework);
+               when CSharp_Exe =>
+                  Build_R :=
+                    Dotnet_Build.Publish_Csharp_Exe
+                      (Root, Meta, Output_Path, Fn, Target_Framework);
+               when others =>
+                  raise Program_Error;
+            end case;
+            if not Build_R.Ok then
+               if Build_R.Error_Length > 0 then
+                  Fail_CLI
+                    (CLI_Dotnet_Build_Failed,
+                     Use_Color,
+                     Build_R.Error_Text (1 .. Build_R.Error_Length));
+               else
+                  Fail_CLI
+                    (CLI_Dotnet_Build_Failed,
+                     Use_Color,
+                     "unknown error");
+               end if;
+               return Ada.Command_Line.Failure;
+            end if;
+         end;
+         return Ada.Command_Line.Success;
+      end if;
+
       Write_Compile_Output
         (Root,
          Meta,
@@ -1539,7 +1857,9 @@ package body Eml.CLI is
          Has_Output,
          Fmt,
          Function_Name,
-         Emit_Eml);
+         Emit_Eml,
+         Target_Framework,
+         No_Companion_Project);
       return Ada.Command_Line.Success;
    end Run_Emlir;
 
@@ -1621,7 +1941,11 @@ package body Eml.CLI is
       Have_Topic         : Boolean := False;
       Have_Function_Name : Boolean := False;
       Have_Emit_Eml      : Boolean := False;
+      Have_Framework     : Boolean := False;
+      Have_No_Companion  : Boolean := False;
       Function_Name_Text : Unbounded_String;
+      Framework_Text     : Unbounded_String :=
+        To_Unbounded_String (Dotnet_Backend.Default_Framework);
       I                  : Positive := 1;
       Use_Color          : Boolean;
       Cmd                : Unbounded_String;
@@ -1846,6 +2170,35 @@ package body Eml.CLI is
                end if;
                Have_Emit_Eml := True;
                I := I + 1;
+            elsif A = "--framework" then
+               if Have_Framework then
+                  if not No_Logo then
+                     Put_Banner;
+                  end if;
+                  Fail_CLI (CLI_Repeated_Framework, not No_Color);
+                  return Ada.Command_Line.Failure;
+               end if;
+               if I = Args'Last then
+                  if not No_Logo then
+                     Put_Banner;
+                  end if;
+                  Fail_CLI (CLI_Missing_Flag_Value, not No_Color, A);
+                  return Ada.Command_Line.Failure;
+               end if;
+               Framework_Text := Args (I + 1);
+               Have_Framework := True;
+               I := I + 2;
+            elsif A = "--no-companion-project" then
+               if Have_No_Companion then
+                  if not No_Logo then
+                     Put_Banner;
+                  end if;
+                  Fail_CLI
+                    (CLI_Repeated_No_Companion_Project, not No_Color);
+                  return Ada.Command_Line.Failure;
+               end if;
+               Have_No_Companion := True;
+               I := I + 1;
             else
                if not No_Logo then
                   Put_Banner;
@@ -1884,6 +2237,8 @@ package body Eml.CLI is
            or else Have_Warn
            or else Have_Function_Name
            or else Have_Emit_Eml
+           or else Have_Framework
+           or else Have_No_Companion
          then
             Fail_CLI (CLI_Unexpected_Argument, Use_Color, "--input");
             return Ada.Command_Line.Failure;
@@ -1929,13 +2284,25 @@ package body Eml.CLI is
             Fail_CLI (CLI_Function_Name_Not_Allowed, Use_Color);
             return Ada.Command_Line.Failure;
          end if;
-         if not Valid_Function_Name (To_String (Function_Name_Text)) then
+         if not Valid_Function_Name (To_String (Function_Name_Text))
+           or else Reserved_Function_Name (To_String (Function_Name_Text))
+         then
             Fail_CLI
               (CLI_Invalid_Function_Name,
                Use_Color,
                To_String (Function_Name_Text));
             return Ada.Command_Line.Failure;
          end if;
+      end if;
+
+      if Have_Framework and then To_String (Cmd) /= "compile" then
+         Fail_CLI (CLI_Framework_Not_Allowed, Use_Color);
+         return Ada.Command_Line.Failure;
+      end if;
+
+      if Have_No_Companion and then To_String (Cmd) /= "compile" then
+         Fail_CLI (CLI_No_Companion_Project_Not_Allowed, Use_Color);
+         return Ada.Command_Line.Failure;
       end if;
 
       if Have_Emit_Eml and then To_String (Cmd) /= "compile" then
@@ -2338,8 +2705,7 @@ package body Eml.CLI is
          end if;
 
          if Have_Function_Name
-           and then Compile_Fmt /= Javascript
-           and then Compile_Fmt /= C_Lib
+           and then not Compile_Fmt_Allows_Function_Name (Compile_Fmt)
          then
             Fail_CLI (CLI_Function_Name_Not_Allowed, Use_Color);
             return Ada.Command_Line.Failure;
@@ -2348,6 +2714,55 @@ package body Eml.CLI is
          if Have_Emit_Eml and then Compile_Fmt /= C_Lib then
             Fail_CLI (CLI_Emit_Eml_Not_Allowed, Use_Color);
             return Ada.Command_Line.Failure;
+         end if;
+
+         if Have_Framework
+           and then not Compile_Fmt_Allows_Framework (Compile_Fmt)
+         then
+            Fail_CLI (CLI_Framework_Not_Allowed, Use_Color);
+            return Ada.Command_Line.Failure;
+         end if;
+
+         if Have_No_Companion
+           and then not Compile_Fmt_Allows_No_Companion (Compile_Fmt)
+         then
+            Fail_CLI (CLI_No_Companion_Project_Not_Allowed, Use_Color);
+            return Ada.Command_Line.Failure;
+         end if;
+
+         if Compile_Fmt_Requires_Dotnet (Compile_Fmt) and then not Have_Output
+         then
+            Fail_CLI
+              (CLI_Dll_Requires_Output,
+               Use_Color,
+               Compile_Format_Image (Compile_Fmt));
+            return Ada.Command_Line.Failure;
+         end if;
+
+         if Compile_Fmt_Allows_Framework (Compile_Fmt) then
+            declare
+               Tfm : constant String := To_String (Framework_Text);
+            begin
+               if Compile_Fmt_Is_Library (Compile_Fmt) then
+                  if not Valid_Library_Tfm (Tfm) then
+                     Fail_CLI
+                       (CLI_Invalid_Framework,
+                        Use_Color,
+                        Tfm,
+                        "netX.0, netstandard2.0, or netstandard2.1");
+                     return Ada.Command_Line.Failure;
+                  end if;
+               else
+                  if not Valid_Program_Tfm (Tfm) then
+                     Fail_CLI
+                       (CLI_Invalid_Framework,
+                        Use_Color,
+                        Tfm,
+                        "netX.0");
+                     return Ada.Command_Line.Failure;
+                  end if;
+               end if;
+            end;
          end if;
 
          if (In_Fmt = Stack_Eml and then Compile_Fmt = Eml_Text)
@@ -2360,18 +2775,29 @@ package body Eml.CLI is
             return Ada.Command_Line.Failure;
          end if;
 
-         if Have_Output
-           and then not Ends_With
-             (To_String (Output_Path), Compile_Extension (Compile_Fmt))
-         then
-            Fail_CLI
-              (CLI_Output_Extension_Mismatch,
-               Use_Color,
-               Compile_Extension (Compile_Fmt),
-               (if Have_Output_Format
-                then To_String (Output_Format_Text)
-                else Compile_Format_Image (Compile_Fmt)));
-            return Ada.Command_Line.Failure;
+         if Have_Output then
+            declare
+               Path     : constant String := To_String (Output_Path);
+               Matches  : constant Boolean :=
+                 (if Compile_Fmt = CSharp_Exe then
+                    Dotnet_Build.Csharp_Exe_Path_Matches (Path)
+                  else Ends_With (Path, Compile_Extension (Compile_Fmt)));
+               Expected : constant String :=
+                 (if Compile_Fmt = CSharp_Exe then
+                    Dotnet_Build.Csharp_Exe_Expected_Suffix
+                  else Compile_Extension (Compile_Fmt));
+            begin
+               if not Matches then
+                  Fail_CLI
+                    (CLI_Output_Extension_Mismatch,
+                     Use_Color,
+                     Expected,
+                     (if Have_Output_Format
+                      then To_String (Output_Format_Text)
+                      else Compile_Format_Image (Compile_Fmt)));
+                  return Ada.Command_Line.Failure;
+               end if;
+            end;
          end if;
 
          begin
@@ -2396,7 +2822,9 @@ package body Eml.CLI is
                         Warn,
                         Use_Color,
                         To_String (Function_Name_Text),
-                        Have_Emit_Eml);
+                        Have_Emit_Eml,
+                        To_String (Framework_Text),
+                        Have_No_Companion);
                   end;
 
                when Beml =>
@@ -2420,7 +2848,9 @@ package body Eml.CLI is
                         Warn,
                         Use_Color,
                         To_String (Function_Name_Text),
-                        Have_Emit_Eml);
+                        Have_Emit_Eml,
+                        To_String (Framework_Text),
+                        Have_No_Companion);
                   end;
             end case;
          exception

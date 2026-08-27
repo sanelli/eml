@@ -172,7 +172,7 @@ Usage:
   eml preproc [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo] [--output-format|-of mxeml|teml]
   eml tokenize [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo] [--output-format|-of tokens]
   eml parse [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo] [--output-format|-of mermaid|md|dot|svg]
-  eml compile [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo] [--output-format|-of eml|beml|js|c|clib] [--function-name|-fn NAME] [--emit-eml]
+  eml compile [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo] [--output-format|-of eml|beml|js|c|clib|csharp|csharplib|csharpdll|csharplibdll|csharpexe|fsharp|fsharplib|visualbasic|visualbasiclib|dotil|dotillib] [--function-name|-fn NAME] [--framework TFM] [--no-companion-project] [--emit-eml]
   eml run [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
 Try 'eml help' for more information.
 ```
@@ -239,30 +239,32 @@ eml parse --no-logo -i filename.mxeml -of svg -o other.svg
 
 ## `compile`
 
-Lower / reconstruct to IR EML and write textual `.eml`, binary `.beml`, browser JavaScript `.js`, or C (`.c` / library `.c`+`.h`).
+Lower / reconstruct to IR EML and write textual `.eml`, binary `.beml`, browser JavaScript `.js`, C (`.c` / library `.c`+`.h`), or .NET sources / DLLs / exe / IL.
 
 ```
-eml compile [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--output-format|-of eml|beml|js|c|clib] [--function-name|-fn NAME] [--emit-eml] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
+eml compile [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--output-format|-of eml|beml|js|c|clib|csharp|csharplib|csharpdll|csharplibdll|csharpexe|fsharp|fsharplib|visualbasic|visualbasiclib|dotil|dotillib] [--function-name|-fn NAME] [--framework TFM] [--no-companion-project] [--emit-eml] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
 ```
 
 - Effective input may be any of the four formats
-- `-o` / `--output` — optional; extension must match `--output-format` (default `beml` → `.beml`); omit → stdout
-- `--output-format` / `-of` — optional; default `beml`; values `eml`, `beml`, `js`, `c`, or `clib`
-- `--function-name` / `-fn NAME` — optional; only with `-of js` (renames entry, default `main`) or `-of clib` (renames entry, default `compute`); identifier: letter/`_` then alnum/`_`; invalid elsewhere
+- `-o` / `--output` — optional; extension must match `--output-format` (default `beml` → `.beml`); omit → stdout. DLL/exe formats require `-o`
+- `--output-format` / `-of` — optional; default `beml`; values `eml`, `beml`, `js`, `c`, `clib`, `csharp`, `csharplib`, `csharpdll`, `csharplibdll`, `csharpexe`, `fsharp`, `fsharplib`, `visualbasic`, `visualbasiclib`, `dotil`, `dotillib`
+- `--function-name` / `-fn NAME` — optional; `-of js` (default `main`), `-of clib` (default `compute`), or any .NET `-of` in this list (default `Compute`). Identifier: letter/`_` then alnum/`_`. Reject a case-insensitive match for `eml` or `Main`
+- `--framework TFM` — long form only (no `-f`); space-separated; default `net8.0`; lowercase required. Program formats (`csharp`, `csharpdll`, `csharpexe`, `fsharp`, `visualbasic`, `dotil`): `net` + digits + `.0`. Library formats (`csharplib`, `csharplibdll`, `fsharplib`, `visualbasiclib`, `dotillib`): that set plus `netstandard2.0` / `netstandard2.1`. Invalid on other `-of` and non-`compile` commands. Repeated flag is invalid CLI
+- `--no-companion-project` — skip companion `.csproj` / `.fsproj` / `.vbproj` when `-o` is set. Meaningful for `csharp`, `csharplib`, `fsharp`, `fsharplib`, `visualbasic`, `visualbasiclib` only. Invalid on DLL/exe/IL/js/c/clib/eml/beml. Repeated is invalid CLI
 - `--emit-eml` — optional switch; only with `-of clib`; when set, declare `eml` in the companion `.h` (otherwise omit from `.h` and keep `eml` `static` in `.c`)
 - `--var` / `--warn` / `--no-color` / `--no-logo` — same shared rules
 - Flag order free; space-separated only (no `--output-format=`)
-- Repeated `--output-format`, `-fn`, or `--emit-eml` is invalid CLI
+- Repeated `--output-format`, `-fn`, `--framework`, `--no-companion-project`, or `--emit-eml` is invalid CLI
 - `eml help compile` → usage on stdout, exit `0`
-- Unknown `-of` values (including future `cli`, `bytecode`, `binary`, `wasm`, `wat`, and the spelling `javascript`) are invalid CLI
-- Exit `0` on success; `1` on invalid CLI, I/O, preprocess, lex, parse, or same-format errors
+- Unknown `-of` values (including `cli`, future `bytecode`, `binary`, `wasm`, `wat`, and the spelling `javascript`) are invalid CLI
+- Exit `0` on success; `1` on invalid CLI, I/O, preprocess, lex, parse, same-format, or `dotnet` errors
 
 ### Same-format compile (rejected)
 
 - effective input `eml` and `-of eml` → error, stop, no output
 - effective input `beml` and `-of beml` → error, stop, no output (including default `-of beml` on a `.beml` input)
 - `mxeml` / `teml` → any compile output is allowed
-- `eml` → `beml` / `js` / `c` / `clib` and `beml` → `eml` / `js` / `c` / `clib` are conversions
+- `eml` → `beml` / `js` / `c` / `clib` / .NET formats and `beml` → `eml` / `js` / `c` / `clib` / .NET formats are conversions
 
 Output extension must match format:
 
@@ -273,6 +275,12 @@ Output extension must match format:
 | `js` | `.js` |
 | `c` | `.c` |
 | `clib` | `.c` |
+| `csharp` / `csharplib` | `.cs` |
+| `csharpdll` / `csharplibdll` | `.dll` |
+| `csharpexe` | `.exe` on Windows; no extension on Linux/macOS |
+| `fsharp` / `fsharplib` | `.fs` |
+| `visualbasic` / `visualbasiclib` | `.vb` |
+| `dotil` / `dotillib` | `.il` |
 
 ### JavaScript (`-of js`)
 
@@ -293,14 +301,38 @@ Output extension must match format:
 - When `-o` is set, also writes a companion `.h` (same basename) with include guard, `#include <complex.h>`, and the entry prototype (plus `eml` iff `--emit-eml`); the `.c` `#include`s that header by simple name
 - Without `-o`, only the `.c` goes to stdout (include name `eml_generated.h`; no header file written)
 
+### C# source (`-of csharp` / `csharplib`)
+
+- Nested IR as `eml(...)` / `new Complex(1, 0)` in `public static class Eml`; `eml` is always public (`--emit-eml` stays clib-only)
+- Program includes `Main` that prints `{real}{imag:+}i`; library omits `Main`
+- Without `-o`, C# only (no `<Project`). With `-o`, also write companion `.csproj` unless `--no-companion-project`
+
+### C# DLL (`-of csharpdll` / `csharplibdll`)
+
+- Require `-o` ending in `.dll` and `dotnet` on `PATH`
+- Write sources + csproj into a unique temp directory, run `dotnet build -c Release --nologo -o artifacts`, copy `Program.dll` to `-o`, then **always** delete the temp tree
+- `csharpdll` uses the program emitter (`OutputType` Exe); `csharplibdll` uses the library emitter (`OutputType` Library). Neither publishes
+- If `dotnet` is missing: diagnostic pointing at https://dotnet.microsoft.com/ ; no output file
+
+### C# exe (`-of csharpexe`)
+
+- Require `-o` and `dotnet` on `PATH`. On Windows, `-o` must end in `.exe`. On Linux and macOS, `-o` must have no extension (`.exe` is rejected)
+- Same temp-dir flow as the DLL formats, but `dotnet publish -c Release -r <rid> --nologo -p:PublishSingleFile=true -p:RollForward=LatestMajor --self-contained false` where `<rid>` is the current host (e.g. `osx-arm64`, `osx-x64`, `linux-x64`, `linux-arm64`, `win-x64`, `win-arm64`); copy the published apphost to `-o` and mark it executable on Unix
+
+### F# / VB / IL
+
+- `fsharp` / `fsharplib`: `module Eml`, companion `.fsproj`
+- `visualbasic` / `visualbasiclib`: `Public Module EmlModule`, companion `.vbproj`
+- `dotil` / `dotillib`: IL text (`.entrypoint` only on `dotil`); no project file; `--no-companion-project` rejected
+
 Pipeline (by format):
 
 - **mxeml** — preprocess → tokenize → parse AST → lower to IR → encode
 - **teml** — preprocess → teml tokenize/parse → IR → encode
-- **eml** — eml tokenize/parse → IR → encode (as beml / js / c / clib only, given same-format rule)
-- **beml** — beml reader / unflatten → IR → encode (as eml / js / c / clib only, given same-format rule)
+- **eml** — eml tokenize/parse → IR → encode (not `-of eml`, given same-format rule)
+- **beml** — beml reader / unflatten → IR → encode (not `-of beml`, given same-format rule)
 
-Stop with no output file on unbound/`--warn error`, lex, parse, or same-format errors.
+Stop with no output file on unbound/`--warn error`, lex, parse, same-format, or `dotnet` errors.
 
 Examples:
 
@@ -315,9 +347,13 @@ eml compile -i f.mxeml -of js -fn run -o out.js
 eml compile -i f.mxeml -of c -o out.c
 eml compile -i f.mxeml -of clib -o out.c
 eml compile -i f.mxeml -of clib -fn eval --emit-eml -o out.c
+eml compile -i f.mxeml -of csharp -o out.cs
+eml compile -i f.mxeml -of csharpdll -o out.dll
+eml compile -i f.mxeml -of csharpexe -o out.exe
+eml compile -i f.mxeml -of csharpexe -o out
 ```
 
-Native / .NET / JVM / wasm / wat backends (`-of cli`, `bytecode`, `binary`, `wasm`, `wat`) are not implemented yet.
+Native / JVM / wasm / wat backends (`-of bytecode`, `binary`, `wasm`, `wat`) are not implemented yet.
 
 ## `run`
 

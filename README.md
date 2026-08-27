@@ -72,6 +72,18 @@ flowchart TD
   irNode --> writeClib["compile -of clib"]
   writeClib --> cLib[".c eml+compute"]
   cLib --> cHdr[".h companion when -o"]
+  irNode --> writeCs["compile -of csharp / csharplib"]
+  writeCs --> csFile[".cs + .csproj when -o"]
+  irNode --> writeCsDll["compile -of csharpdll / csharplibdll"]
+  writeCsDll --> csDll[".dll via dotnet build"]
+  irNode --> writeCsExe["compile -of csharpexe"]
+  writeCsExe --> csExe["host-native via dotnet publish"]
+  irNode --> writeFs["compile -of fsharp / fsharplib"]
+  writeFs --> fsFile[".fs + .fsproj when -o"]
+  irNode --> writeVb["compile -of visualbasic / visualbasiclib"]
+  writeVb --> vbFile[".vb + .vbproj when -o"]
+  irNode --> writeIl["compile -of dotil / dotillib"]
+  writeIl --> ilFile[".il"]
   flatten --> stack[Complex stack]
   stack --> stdout["eml run: stdout compact Complex"]
 ```
@@ -82,7 +94,13 @@ opcodes and evaluates on a complex stack (no output file). `-of js` walks the
 IR tree into nested `eml(...)` calls (no Flatten) and, with `-o`, writes a
 companion `.html` that loads math.js and the generated script. `-of c` emits a
 standalone C program (`<complex.h>`, `long double complex`); `-of clib` emits
-a library `.c` and, with `-o`, a companion `.h` (`eml` + `compute`).
+a library `.c` and, with `-o`, a companion `.h` (`eml` + `compute`). C# / F# /
+VB source formats write nested `eml(...)` using `System.Numerics.Complex`;
+with `-o` they also write a companion project file unless
+`--no-companion-project`. `-of csharpdll` / `csharplibdll` invoke
+`dotnet build` and require `-o` ending in `.dll`. `-of csharpexe` invokes
+`dotnet publish` for the current OS (Linux, Windows, or macOS) and requires
+`-o` ending in `.exe` on Windows, or a name with no extension on Linux/macOS.
 
 ## Run
 
@@ -142,7 +160,8 @@ Accepts all four input formats. `-of` / `--output-format`: `mermaid` (default),
 ### Compile
 
 Lower to stack-machine IR (`.beml` binary by default, or textual `.eml`), emit
-browser JavaScript (`.js`), or emit C (`.c` / library `.c`+`.h`):
+browser JavaScript (`.js`), C (`.c` / library `.c`+`.h`), or .NET sources and
+binaries:
 
 ```powershell
 ./bin/eml compile -i filename.mxeml
@@ -154,9 +173,15 @@ browser JavaScript (`.js`), or emit C (`.c` / library `.c`+`.h`):
 ./bin/eml compile -i f.mxeml -of js -o out.js
 ./bin/eml compile -i f.mxeml -of c -o out.c
 ./bin/eml compile -i f.mxeml -of clib -o out.c
+./bin/eml compile -i f.mxeml -of csharp -o out.cs
+./bin/eml compile -i f.mxeml -of csharpdll -o out.dll
+./bin/eml compile -i f.mxeml -of csharpexe -o out.exe   # Windows
+./bin/eml compile -i f.mxeml -of csharpexe -o out       # Linux / macOS
 ```
 
-- `-of` / `--output-format` — `beml` (default), `eml`, `js`, `c`, or `clib`
+- `-of` / `--output-format` — `beml` (default), `eml`, `js`, `c`, `clib`,
+  `csharp`, `csharplib`, `csharpdll`, `csharplibdll`, `csharpexe`, `fsharp`,
+  `fsharplib`, `visualbasic`, `visualbasiclib`, `dotil`, or `dotillib`
   (replaces old `-f` / `--format`)
 - Same-format compile is an error (`eml`→`eml`, `beml`→`beml`)
 - `--format` / `-f` is rejected; use `-of`
@@ -174,8 +199,23 @@ browser JavaScript (`.js`), or emit C (`.c` / library `.c`+`.h`):
   companion `.h` with the entry prototype; add `--emit-eml` to also declare
   `eml` in the header (otherwise `eml` is `static` in the `.c` only). Without
   `-o`, only the `.c` goes to stdout.
-- **Future (not implemented yet):** compile targets **`wasm`** and **`wat`**
-  (textual WebAssembly).
+- `-of csharp` / `csharplib` write C# source (`System.Numerics.Complex`).
+  Default entry is `Compute` (`-fn`). With `-o`, also write a companion
+  `.csproj` unless `--no-companion-project`. Without `-o`, source only.
+- `-of csharpdll` / `csharplibdll` require `-o` ending in `.dll` and the
+  `dotnet` SDK. They emit C# into a temp directory and run
+  `dotnet build -c Release`, then copy `Program.dll`.
+- `-of csharpexe` requires the `dotnet` SDK and `-o`. On Windows, `-o` must
+  end in `.exe`; on Linux and macOS, `-o` must have no extension (not
+  `.exe`). It runs `dotnet publish -r <rid>` (single-file, framework-dependent)
+  for the current OS/arch and copies the published apphost.
+- `-of fsharp` / `fsharplib` and `visualbasic` / `visualbasiclib` mirror the
+  C# source/lib pair (`.fs`/`.fsproj`, `.vb`/`.vbproj`).
+- `-of dotil` / `dotillib` write IL text for `ilasm` (`.il`; no project file).
+- `--framework` (default `net8.0`) applies to the .NET formats. Programs
+  accept `netX.0` only; libraries also accept `netstandard2.0` / `2.1`.
+- **Future (not implemented yet):** compile targets **`bytecode`**,
+  **`binary`**, **`wasm`**, and **`wat`**.
 
 ### Run
 
@@ -271,8 +311,10 @@ which captures stdout into a variable (not printed) and checks
 `|actual - expected| < 0.01`. Taylor `.mxeml` samples are skipped for `run`
 (and for IR chaining). For `parse`, each sample is emitted in all four formats.
 For `compile`, each sample writes default `.beml`, `-of eml` `.eml`, and (for
-non-taylor sources) `-of js` `.js` plus companion `.html`, plus `-of c` / `-of clib`
-(`.c`, and `.h` for clib). Exit `1`
+non-taylor sources) `-of js` `.js` plus companion `.html`, plus `-of c` /
+`-of clib` (`.c`, and `.h` for clib), plus C# / F# / VB / IL source formats.
+DLL formats (`csharpdll`, `csharplibdll`, `csharpexe`) run only when `dotnet`
+is on `PATH`. Exit `1`
 if any sample fails.
 
 ## Test
@@ -309,6 +351,13 @@ paths.
 | `src/beml_parser.*` | BEML opcodes → IR |
 | `src/ir_eml.*` | Shared IR EML tree, encoders, and tree dumps |
 | `src/interpreter.*` | In-process ONE/EML interpreter (`eml run`) |
+| `src/js_backend.*` | JavaScript backend (`-of js`) |
+| `src/c_backend.*` | C program and library backends |
+| `src/dotnet_backend.*` | C# source / csproj emitter |
+| `src/dotnet_build.*` | `dotnet build` / `publish` for DLL and exe |
+| `src/fsharp_backend.*` | F# source / fsproj emitter |
+| `src/vb_backend.*` | Visual Basic source / vbproj emitter |
+| `src/il_backend.*` | IL text emitter (`dotil` / `dotillib`) |
 | `tests/` | Unit and CLI tests |
 | `scripts/embed_git_commit.ps1` | Pre-build short-hash embed |
 | `scripts/run_samples.ps1` | Batch preproc / tokenize / parse / compile / run samples |

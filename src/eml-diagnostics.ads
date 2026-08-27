@@ -38,6 +38,14 @@ package Eml.Diagnostics is
    CLI_Function_Name_Not_Allowed      : constant Diagnostic_Id := 30;
    CLI_Repeated_Emit_Eml              : constant Diagnostic_Id := 31;
    CLI_Emit_Eml_Not_Allowed           : constant Diagnostic_Id := 32;
+   CLI_Repeated_Framework             : constant Diagnostic_Id := 33;
+   CLI_Invalid_Framework              : constant Diagnostic_Id := 34;
+   CLI_Framework_Not_Allowed          : constant Diagnostic_Id := 35;
+   CLI_Repeated_No_Companion_Project  : constant Diagnostic_Id := 36;
+   CLI_No_Companion_Project_Not_Allowed : constant Diagnostic_Id := 37;
+   CLI_Dll_Requires_Output            : constant Diagnostic_Id := 38;
+   CLI_Dotnet_Not_Found               : constant Diagnostic_Id := 39;
+   CLI_Dotnet_Build_Failed            : constant Diagnostic_Id := 40;
 
    --  Preprocessor (00100-00199)
    PP_Unbound_Variable                : constant Diagnostic_Id := 100;

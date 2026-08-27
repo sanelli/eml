@@ -98,16 +98,50 @@ package body Eml.Diagnostics is
             return
               "invalid --function-name/-fn '"
               & Param1
-              & "' (expected a C/JS identifier)";
+              & "' (expected an identifier; "
+              & "eml and Main are reserved)";
          when CLI_Function_Name_Not_Allowed =>
             return
-              "--function-name/-fn is only allowed for "
-              & "compile -of js or clib";
+              "--function-name/-fn is only allowed for compile "
+              & "-of js, clib, csharp, csharplib, csharpdll, "
+              & "csharplibdll, csharpexe, fsharp, fsharplib, "
+              & "visualbasic, visualbasiclib, dotil, or dotillib";
          when CLI_Repeated_Emit_Eml =>
             return "repeated --emit-eml";
          when CLI_Emit_Eml_Not_Allowed =>
             return
               "--emit-eml is only allowed for compile -of clib";
+         when CLI_Repeated_Framework =>
+            return "repeated --framework";
+         when CLI_Invalid_Framework =>
+            return
+              "invalid --framework '"
+              & Param1
+              & "' (expected "
+              & Param2
+              & ")";
+         when CLI_Framework_Not_Allowed =>
+            return
+              "--framework is only allowed for compile with "
+              & "a .NET output format";
+         when CLI_Repeated_No_Companion_Project =>
+            return "repeated --no-companion-project";
+         when CLI_No_Companion_Project_Not_Allowed =>
+            return
+              "--no-companion-project is only allowed for compile "
+              & "-of csharp, csharplib, fsharp, fsharplib, "
+              & "visualbasic, or visualbasiclib";
+         when CLI_Dll_Requires_Output =>
+            return
+              "compile -of "
+              & Param1
+              & " requires --output/-o (binary output)";
+         when CLI_Dotnet_Not_Found =>
+            return
+              "dotnet executable not found; install the .NET SDK "
+              & "from https://dotnet.microsoft.com/";
+         when CLI_Dotnet_Build_Failed =>
+            return "dotnet build failed: " & Param1;
          when CLI_Input_Format_Required =>
             return
               "missing --input-format/-if "
