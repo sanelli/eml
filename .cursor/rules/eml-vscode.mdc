@@ -24,4 +24,4 @@ Programmatic features (language server, completions, diagnostics, go-to-definiti
 - Highlighting for **`.mxeml`** must distinguish `eml(...)`, `1`, constants, `$VARNAME`, operators, and functions (including hyperbolic `sinh`, `cosh`, `tanh` alongside `sin`, `cos`, `tan`, `log`, `sqrt`).
 - Highlighting for **`.teml`** must distinguish nested `eml(...)`, `1`, parentheses, and commas (no math operators).
 - Highlighting for **`.eml`** must distinguish opcodes `ONE` / `EML`, header `--` comments, and optional trailing rewrite tags.
-- Do not couple the extension to LLVM / .NET / JVM backends.
+- Do not couple the extension to .NET backends.

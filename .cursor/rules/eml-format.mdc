@@ -67,4 +67,4 @@ Further rewrites (arithmetic, trig, constants, …) come from that paper. Prefer
 
 ## Interpreter
 
-The same executable interprets EML by evaluating the `eml` tree over complex numbers. Do not require LLVM / .NET / JVM to interpret.
+The same executable interprets EML by evaluating the `eml` tree over complex numbers. Do not require .NET to interpret.

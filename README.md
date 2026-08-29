@@ -214,8 +214,7 @@ binaries:
 - `-of dotil` / `dotillib` write IL text for `ilasm` (`.il`; no project file).
 - `--framework` (default `net8.0`) applies to the .NET formats. Programs
   accept `netX.0` only; libraries also accept `netstandard2.0` / `2.1`.
-- **Future (not implemented yet):** compile targets **`bytecode`**,
-  **`binary`**, **`wasm`**, and **`wat`**.
+- **Future (not implemented yet):** compile targets **`wasm`** and **`wat`**.
 
 ### Run
 

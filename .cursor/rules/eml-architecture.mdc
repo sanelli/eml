@@ -7,7 +7,7 @@ alwaysApply: true
 
 - Language: **Ada**
 - Toolchain: **Alire**
-- Libraries (Ada crate): **no third-party crates**, except **LLVM bindings** for the native backend. All GNAT/Ada standard libraries are allowed. The VS Code extension may use the VS Code extension APIs (and usual npm tooling).
+- Libraries (Ada crate): **no third-party crates**. All GNAT/Ada standard libraries are allowed. The VS Code extension may use the VS Code extension APIs (and usual npm tooling).
 - Ship **one Ada executable** (compiler + interpreter), named `eml`.
 - Also ship a **VS Code extension** (separate from the Ada crate; see `eml-vscode`).
 
@@ -30,10 +30,10 @@ Tokenizers emit tokens. Parsers emit trees / IR. Do not skip the parse step. Bin
 ## Pipelines
 
 ```
-.mxeml → preprocessor → expr tokenizer → expr parser → (parse: AST dump | compile: Expr_Lower) → IR EML → .eml | .beml | .js (+ .html) | .c | clib (.c+.h) | csharp / csharplib / csharpdll / csharplibdll / csharpexe | fsharp / fsharplib | visualbasic / visualbasiclib | dotil / dotillib | native | JVM | interpret
-.teml  → preprocessor → teml tokenizer → teml parser → IR EML → .eml | .beml | .js (+ .html) | .c | clib (.c+.h) | csharp / csharplib / csharpdll / csharplibdll / csharpexe | fsharp / fsharplib | visualbasic / visualbasiclib | dotil / dotillib | native | JVM | interpret
-.eml   → eml tokenizer → eml parser → IR EML → .beml | .js (+ .html) | .c | clib (.c+.h) | csharp / csharplib / csharpdll / csharplibdll / csharpexe | fsharp / fsharplib | visualbasic / visualbasiclib | dotil / dotillib | native | JVM | interpret
-.beml  → beml reader → Unflatten → IR EML → .eml | .js (+ .html) | .c | clib (.c+.h) | csharp / csharplib / csharpdll / csharplibdll / csharpexe | fsharp / fsharplib | visualbasic / visualbasiclib | dotil / dotillib | native | JVM | interpret
+.mxeml → preprocessor → expr tokenizer → expr parser → (parse: AST dump | compile: Expr_Lower) → IR EML → .eml | .beml | .js (+ .html) | .c | clib (.c+.h) | csharp / csharplib / csharpdll / csharplibdll / csharpexe | fsharp / fsharplib | visualbasic / visualbasiclib | dotil / dotillib | interpret
+.teml  → preprocessor → teml tokenizer → teml parser → IR EML → .eml | .beml | .js (+ .html) | .c | clib (.c+.h) | csharp / csharplib / csharpdll / csharplibdll / csharpexe | fsharp / fsharplib | visualbasic / visualbasiclib | dotil / dotillib | interpret
+.eml   → eml tokenizer → eml parser → IR EML → .beml | .js (+ .html) | .c | clib (.c+.h) | csharp / csharplib / csharpdll / csharplibdll / csharpexe | fsharp / fsharplib | visualbasic / visualbasiclib | dotil / dotillib | interpret
+.beml  → beml reader → Unflatten → IR EML → .eml | .js (+ .html) | .c | clib (.c+.h) | csharp / csharplib / csharpdll / csharplibdll / csharpexe | fsharp / fsharplib | visualbasic / visualbasiclib | dotil / dotillib | interpret
 .mxeml | .teml → preproc → expanded same-format text
 .mxeml | .teml | .eml → tokenize → .tokens
 .mxeml | .teml | .eml | .beml → parse → .syntaxtree (mermaid/md/dot/svg)

@@ -1,5 +1,5 @@
 ---
-description: Compilation targets from IR EML (EML text, JS, C, .NET, LLVM, Java bytecode)
+description: Compilation targets from IR EML (EML text, JS, C, .NET)
 alwaysApply: true
 ---
 
@@ -20,14 +20,12 @@ All backends consume **IR EML** (never the source AST directly).
 | **F# / VB source** | Same IR walk (`-of fsharp` / `fsharplib` / `visualbasic` / `visualbasiclib`) |
 | **IL text** | `ilasm` text (`-of dotil` / `dotillib`; `.il`; no project file) |
 | **EML tree text** | Nested `eml(...)` and `1` (`.teml` input / IR tree dumps; not a compile `-of` yet) |
-| **Native binary** | Lower IR EML through **LLVM** to a machine-code executable |
-| **Java bytecode** | Emit a **Java class**; **may use** Java math |
 | **Interpreter** | Evaluate IR EML in-process (same executable) |
 
-Native LLVM lowering should realize `eml(x, y) = exp(x) - ln(y)` (complex). .NET and Java backends may call the host language’s `exp` / `log` (and other math) instead of expanding everything to a single opcode. The JS backend defines `eml` with math.js (`math.exp` / `math.log`) and nests calls from the IR tree (no Flatten). The C backends define `eml` with `cexpl` / `clogl` on `long double complex` and nest the same IR tree. C# / F# / VB / IL define `eml` as `Complex.Exp(x) - Complex.Log(y)` and nest the IR tree.
+.NET backends may call the host language’s `exp` / `log` (and other math) instead of expanding everything to a single opcode. The JS backend defines `eml` with math.js (`math.exp` / `math.log`) and nests calls from the IR tree (no Flatten). The C backends define `eml` with `cexpl` / `clogl` on `long double complex` and nest the same IR tree. C# / F# / VB / IL define `eml` as `Complex.Exp(x) - Complex.Log(y)` and nest the IR tree.
 
-`eml compile --output-format` / `-of` currently supports `eml` (textual stack IR), `beml` (binary stack IR), `js` (browser JavaScript + companion HTML when `-o` is set), `c` (standalone C program), `clib` (C library `.c` + companion `.h` when `-o` is set), `csharp` / `csharplib` (C# source + companion `.csproj` when `-o`), `csharpdll` / `csharplibdll` (`dotnet build` → `.dll`), `csharpexe` (`dotnet publish -r <host-rid>` → `.exe` on Windows, extensionless on Linux/macOS), `fsharp` / `fsharplib`, `visualbasic` / `visualbasiclib`, and `dotil` / `dotillib`. `--format` / `-f` is removed. Future `-of` values: `bytecode` → Java, `binary` → LLVM native, **`wasm`** → WebAssembly binary, **`wat`** → textual WebAssembly. Same-format compile (`eml`→`eml`, `beml`→`beml`) is rejected. See `eml-cli`.
+`eml compile --output-format` / `-of` currently supports `eml` (textual stack IR), `beml` (binary stack IR), `js` (browser JavaScript + companion HTML when `-o` is set), `c` (standalone C program), `clib` (C library `.c` + companion `.h` when `-o` is set), `csharp` / `csharplib` (C# source + companion `.csproj` when `-o`), `csharpdll` / `csharplibdll` (`dotnet build` → `.dll`), `csharpexe` (`dotnet publish -r <host-rid>` → `.exe` on Windows, extensionless on Linux/macOS), `fsharp` / `fsharplib`, `visualbasic` / `visualbasiclib`, and `dotil` / `dotillib`. `--format` / `-f` is removed. Future `-of` values: **`wasm`** → WebAssembly binary, **`wat`** → textual WebAssembly. Same-format compile (`eml`→`eml`, `beml`→`beml`) is rejected. See `eml-cli`.
 
 ## Not yet specified
 
-- Runtime ABI for `$VARNAME` inside generated binaries (how compiled `bytecode` / `binary` / `wasm` artifacts receive bindings).
+- Runtime ABI for `$VARNAME` inside generated binaries (how compiled `wasm` artifacts receive bindings).

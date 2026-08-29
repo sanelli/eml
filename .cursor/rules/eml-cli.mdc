@@ -256,7 +256,7 @@ eml compile [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--outp
 - Flag order free; space-separated only (no `--output-format=`)
 - Repeated `--output-format`, `-fn`, `--framework`, `--no-companion-project`, or `--emit-eml` is invalid CLI
 - `eml help compile` → usage on stdout, exit `0`
-- Unknown `-of` values (including `cli`, future `bytecode`, `binary`, `wasm`, `wat`, and the spelling `javascript`) are invalid CLI
+- Unknown `-of` values (including `cli`, future `wasm`, `wat`, and the spelling `javascript`) are invalid CLI
 - Exit `0` on success; `1` on invalid CLI, I/O, preprocess, lex, parse, same-format, or `dotnet` errors
 
 ### Same-format compile (rejected)
@@ -353,7 +353,7 @@ eml compile -i f.mxeml -of csharpexe -o out.exe
 eml compile -i f.mxeml -of csharpexe -o out
 ```
 
-Native / JVM / wasm / wat backends (`-of bytecode`, `binary`, `wasm`, `wat`) are not implemented yet.
+wasm / wat backends (`-of wasm`, `wat`) are not implemented yet.
 
 ## `run`
 
