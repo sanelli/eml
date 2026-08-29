@@ -10,7 +10,7 @@ Build:
 - a **single Ada executable** (`eml`) that is both a **compiler** and an **interpreter**
 - a **VS Code extension** for `.mxeml` / `.teml` / `.eml` (declarative editing; see `eml-vscode` rule)
 
-The compiler reads one of four input formats (`.mxeml`, `.teml`, `.eml`, `.beml`) and emits stack EML text, binary `.beml`, JavaScript, C, or .NET sources/DLLs/exes (`csharp`, `csharplib`, `csharpdll`, `csharplibdll`, `csharpexe`, `fsharp`, `visualbasic`, `dotil`, …). The interpreter runs any of those inputs via `eml run`. CLI: `eml-cli`. CI/releases: `eml-ci`.
+The compiler reads one of four input formats (`.mxeml`, `.teml`, `.eml`, `.beml`) and emits stack EML text, binary `.beml`, JavaScript, C, native binaries (`exe`, `lib`, `dynamiclib`), or .NET sources/DLLs/exes (`csharp`, `csharplib`, `csharpdll`, `csharplibdll`, `csharpexe`, `fsharp`, `visualbasic`, `dotil`, …). The interpreter runs any of those inputs via `eml run`. CLI: `eml-cli`. CI/releases: `eml-ci`.
 
 Do not implement code unless the user asks for that specific chunk. Keep future extensions out of the current design unless requested.
 

@@ -110,7 +110,8 @@ package body Eml.Diagnostics is
             return "repeated --emit-eml";
          when CLI_Emit_Eml_Not_Allowed =>
             return
-              "--emit-eml is only allowed for compile -of clib";
+              "--emit-eml is only allowed for compile "
+              & "-of clib, lib, or dynamiclib";
          when CLI_Repeated_Framework =>
             return "repeated --framework";
          when CLI_Invalid_Framework =>
@@ -142,6 +143,12 @@ package body Eml.Diagnostics is
               & "from https://dotnet.microsoft.com/";
          when CLI_Dotnet_Build_Failed =>
             return "dotnet build failed: " & Param1;
+         when CLI_C_Compiler_Not_Found =>
+            return
+              "C compiler not found; install clang or gcc "
+              & "(or cl.exe on Windows)";
+         when CLI_C_Compile_Failed =>
+            return "C compile failed: " & Param1;
          when CLI_Input_Format_Required =>
             return
               "missing --input-format/-if "

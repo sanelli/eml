@@ -46,6 +46,8 @@ package Eml.Diagnostics is
    CLI_Dll_Requires_Output            : constant Diagnostic_Id := 38;
    CLI_Dotnet_Not_Found               : constant Diagnostic_Id := 39;
    CLI_Dotnet_Build_Failed            : constant Diagnostic_Id := 40;
+   CLI_C_Compiler_Not_Found           : constant Diagnostic_Id := 41;
+   CLI_C_Compile_Failed               : constant Diagnostic_Id := 42;
 
    --  Preprocessor (00100-00199)
    PP_Unbound_Variable                : constant Diagnostic_Id := 100;

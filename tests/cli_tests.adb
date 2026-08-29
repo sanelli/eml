@@ -8,6 +8,7 @@ with Ada.Text_IO;
 
 with Eml.CLI;
 with Eml.Info;
+with C_Build;
 with Dotnet_Build;
 
 package body CLI_Tests is
@@ -2653,6 +2654,390 @@ package body CLI_Tests is
                  (Magic /= "MZ",
                   "cli-compile-csharpexe: not windows pe");
             end if;
+         end;
+      end if;
+
+      declare
+         In_Path : constant String :=
+           Write_Temp ("cli_compile_exe_no.mxeml", "e");
+         Args    : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("exe")];
+         Status  : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure,
+            "cli-compile-exe-no-o: exit");
+      end;
+
+      declare
+         In_Path  : constant String :=
+           Write_Temp ("cli_compile_exe_ext.mxeml", "e");
+         Out_Name : constant String :=
+           (if C_Build.Host_Is_Windows
+            then "cli_compile_exe_ext"
+            else "cli_compile_exe_ext.exe");
+         Out_Path : constant String :=
+           Ada.Directories.Compose (Temp_Dir, Out_Name);
+         Args     : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("exe"),
+            A ("-o"),
+            A (Out_Path)];
+         Status   : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure,
+            "cli-compile-exe-ext: exit");
+      end;
+
+      declare
+         In_Path  : constant String :=
+           Write_Temp ("cli_compile_lib_ext.mxeml", "e");
+         Out_Path : constant String :=
+           Ada.Directories.Compose
+             (Temp_Dir,
+              (if C_Build.Host_Is_Windows
+               then "cli_compile_lib_ext.a"
+               else "cli_compile_lib_ext.lib"));
+         Args     : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("lib"),
+            A ("-o"),
+            A (Out_Path)];
+         Status   : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure,
+            "cli-compile-lib-ext: exit");
+      end;
+
+      declare
+         In_Path  : constant String :=
+           Write_Temp ("cli_compile_dyn_ext.mxeml", "e");
+         Out_Path : constant String :=
+           Ada.Directories.Compose
+             (Temp_Dir,
+              (if C_Build.Host_Is_Windows then "cli_compile_dyn_ext.so"
+               elsif C_Build.Host_Is_Darwin
+                 then "cli_compile_dyn_ext.so"
+               else "cli_compile_dyn_ext.dylib"));
+         Args     : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("dynamiclib"),
+            A ("-o"),
+            A (Out_Path)];
+         Status   : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure,
+            "cli-compile-dynamiclib-ext: exit");
+      end;
+
+      declare
+         In_Path  : constant String :=
+           Write_Temp ("cli_compile_exe_emit.mxeml", "e");
+         Out_Path : constant String :=
+           Ada.Directories.Compose
+             (Temp_Dir,
+              (if C_Build.Host_Is_Windows
+               then "cli_compile_exe_emit.exe"
+               else "cli_compile_exe_emit"));
+         Args     : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("exe"),
+            A ("--emit-eml"),
+            A ("-o"),
+            A (Out_Path)];
+         Status   : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure,
+            "cli-compile-exe-emit: exit");
+      end;
+
+      declare
+         In_Path  : constant String :=
+           Write_Temp ("cli_compile_lib_nc.mxeml", "e");
+         Out_Path : constant String :=
+           Ada.Directories.Compose
+             (Temp_Dir,
+              "cli_compile_lib_nc" & C_Build.Native_Lib_Expected_Suffix);
+         Args     : constant Eml.CLI.Arg_Array :=
+           [A ("--no-logo"),
+            A ("--no-color"),
+            A ("compile"),
+            A ("-i"),
+            A (In_Path),
+            A ("-of"),
+            A ("lib"),
+            A ("-o"),
+            A (Out_Path),
+            A ("--no-companion-project")];
+         Status   : constant Ada.Command_Line.Exit_Status :=
+           Eml.CLI.Run (Args);
+      begin
+         Require
+           (Status = Ada.Command_Line.Failure,
+            "cli-compile-lib-nc: exit");
+      end;
+
+      if not C_Build.C_Compiler_On_Path then
+         declare
+            In_Path  : constant String :=
+              Write_Temp ("cli_compile_exe_nocc.mxeml", "e");
+            Out_Path : constant String :=
+              Ada.Directories.Compose
+                (Temp_Dir,
+                 (if C_Build.Host_Is_Windows
+                  then "cli_compile_exe_nocc.exe"
+                  else "cli_compile_exe_nocc"));
+            Args     : constant Eml.CLI.Arg_Array :=
+              [A ("--no-logo"),
+               A ("--no-color"),
+               A ("compile"),
+               A ("-i"),
+               A (In_Path),
+               A ("-of"),
+               A ("exe"),
+               A ("-o"),
+               A (Out_Path)];
+            Status   : constant Ada.Command_Line.Exit_Status :=
+              Eml.CLI.Run (Args);
+         begin
+            Require
+              (Status = Ada.Command_Line.Failure,
+               "cli-compile-exe-nocc: exit");
+            Require
+              (not Ada.Directories.Exists (Out_Path),
+               "cli-compile-exe-nocc: no file");
+         end;
+      else
+         declare
+            In_Path  : constant String :=
+              Write_Temp ("cli_compile_exe.mxeml", "e");
+            Out_Path : constant String :=
+              Ada.Directories.Compose
+                (Temp_Dir,
+                 (if C_Build.Host_Is_Windows
+                  then "cli_compile_exe.exe"
+                  else "cli_compile_exe"));
+            Hdr_Path : constant String :=
+              Ada.Directories.Compose (Temp_Dir, "cli_compile_exe.h");
+            Args     : constant Eml.CLI.Arg_Array :=
+              [A ("--no-logo"),
+               A ("--no-color"),
+               A ("compile"),
+               A ("-i"),
+               A (In_Path),
+               A ("-of"),
+               A ("exe"),
+               A ("-o"),
+               A (Out_Path)];
+            Status   : constant Ada.Command_Line.Exit_Status :=
+              Eml.CLI.Run (Args);
+            Magic    : String (1 .. 2);
+         begin
+            Require
+              (Status = Ada.Command_Line.Success,
+               "cli-compile-exe: exit");
+            Require
+              (Ada.Directories.Exists (Out_Path)
+               and then Ada.Directories.Size (Out_Path) > 0,
+               "cli-compile-exe: file");
+            Require
+              (not Ada.Directories.Exists (Hdr_Path),
+               "cli-compile-exe: no header");
+            if Ada.Directories.Size (Out_Path) >= 2 then
+               Magic :=
+                 Character'Val
+                   (Integer
+                      (Read_Bytes (Out_Path, 2) (Stream_Element_Offset (1))))
+                 & Character'Val
+                   (Integer
+                      (Read_Bytes (Out_Path, 2) (Stream_Element_Offset (2))));
+               if C_Build.Host_Is_Windows then
+                  Require (Magic = "MZ", "cli-compile-exe: windows pe");
+               else
+                  Require (Magic /= "MZ", "cli-compile-exe: not windows pe");
+               end if;
+            end if;
+         end;
+
+         declare
+            In_Path  : constant String :=
+              Write_Temp ("cli_compile_lib.mxeml", "e");
+            Out_Path : constant String :=
+              Ada.Directories.Compose
+                (Temp_Dir,
+                 "cli_compile_lib" & C_Build.Native_Lib_Expected_Suffix);
+            Hdr_Path : constant String :=
+              Ada.Directories.Compose (Temp_Dir, "cli_compile_lib.h");
+            Args     : constant Eml.CLI.Arg_Array :=
+              [A ("--no-logo"),
+               A ("--no-color"),
+               A ("compile"),
+               A ("-i"),
+               A (In_Path),
+               A ("-of"),
+               A ("lib"),
+               A ("-o"),
+               A (Out_Path)];
+            Status   : constant Ada.Command_Line.Exit_Status :=
+              Eml.CLI.Run (Args);
+            Hdr      : constant String := Read_All (Hdr_Path);
+         begin
+            Require
+              (Status = Ada.Command_Line.Success,
+               "cli-compile-lib: exit");
+            Require
+              (Ada.Directories.Exists (Out_Path)
+               and then Ada.Directories.Size (Out_Path) > 0,
+               "cli-compile-lib: file");
+            Require
+              (Ada.Directories.Exists (Hdr_Path),
+               "cli-compile-lib: header");
+            Require
+              (Ada.Strings.Fixed.Index (Hdr, "compute(void);") > 0,
+               "cli-compile-lib: compute proto");
+         end;
+
+         declare
+            In_Path  : constant String :=
+              Write_Temp ("cli_compile_dyn.mxeml", "e");
+            Out_Path : constant String :=
+              Ada.Directories.Compose
+                (Temp_Dir,
+                 "cli_compile_dyn"
+                   & C_Build.Native_Dynamiclib_Expected_Suffix);
+            Hdr_Path : constant String :=
+              Ada.Directories.Compose (Temp_Dir, "cli_compile_dyn.h");
+            Args     : constant Eml.CLI.Arg_Array :=
+              [A ("--no-logo"),
+               A ("--no-color"),
+               A ("compile"),
+               A ("-i"),
+               A (In_Path),
+               A ("-of"),
+               A ("dynamiclib"),
+               A ("-o"),
+               A (Out_Path)];
+            Status   : constant Ada.Command_Line.Exit_Status :=
+              Eml.CLI.Run (Args);
+         begin
+            Require
+              (Status = Ada.Command_Line.Success,
+               "cli-compile-dynamiclib: exit");
+            Require
+              (Ada.Directories.Exists (Out_Path)
+               and then Ada.Directories.Size (Out_Path) > 0,
+               "cli-compile-dynamiclib: file");
+            Require
+              (Ada.Directories.Exists (Hdr_Path),
+               "cli-compile-dynamiclib: header");
+         end;
+
+         declare
+            In_Path  : constant String :=
+              Write_Temp ("cli_compile_lib_fn.mxeml", "e");
+            Out_Path : constant String :=
+              Ada.Directories.Compose
+                (Temp_Dir,
+                 "cli_compile_lib_fn"
+                   & C_Build.Native_Lib_Expected_Suffix);
+            Hdr_Path : constant String :=
+              Ada.Directories.Compose (Temp_Dir, "cli_compile_lib_fn.h");
+            Args     : constant Eml.CLI.Arg_Array :=
+              [A ("--no-logo"),
+               A ("--no-color"),
+               A ("compile"),
+               A ("-i"),
+               A (In_Path),
+               A ("-of"),
+               A ("lib"),
+               A ("-fn"),
+               A ("eval"),
+               A ("--emit-eml"),
+               A ("-o"),
+               A (Out_Path)];
+            Status   : constant Ada.Command_Line.Exit_Status :=
+              Eml.CLI.Run (Args);
+            Hdr      : constant String := Read_All (Hdr_Path);
+         begin
+            Require
+              (Status = Ada.Command_Line.Success,
+               "cli-compile-lib-fn: exit");
+            Require
+              (Ada.Strings.Fixed.Index (Hdr, "eval(void);") > 0,
+               "cli-compile-lib-fn: eval proto");
+            Require
+              (Ada.Strings.Fixed.Index (Hdr, "eml(") > 0,
+               "cli-compile-lib-fn: eml proto");
+         end;
+
+         declare
+            In_Path  : constant String :=
+              Write_Temp ("cli_compile_exe_lex.mxeml", "1+@2");
+            Out_Path : constant String :=
+              Ada.Directories.Compose
+                (Temp_Dir,
+                 (if C_Build.Host_Is_Windows
+                  then "cli_compile_exe_lex.exe"
+                  else "cli_compile_exe_lex"));
+            Hdr_Path : constant String :=
+              Ada.Directories.Compose (Temp_Dir, "cli_compile_exe_lex.h");
+            Args     : constant Eml.CLI.Arg_Array :=
+              [A ("--no-logo"),
+               A ("--no-color"),
+               A ("compile"),
+               A ("-i"),
+               A (In_Path),
+               A ("-of"),
+               A ("exe"),
+               A ("-o"),
+               A (Out_Path)];
+            Status   : constant Ada.Command_Line.Exit_Status :=
+              Eml.CLI.Run (Args);
+         begin
+            Require
+              (Status = Ada.Command_Line.Failure,
+               "cli-compile-exe-lex: exit");
+            Require
+              (not Ada.Directories.Exists (Out_Path),
+               "cli-compile-exe-lex: no exe");
+            Require
+              (not Ada.Directories.Exists (Hdr_Path),
+               "cli-compile-exe-lex: no header");
          end;
       end if;
 

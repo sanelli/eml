@@ -148,6 +148,66 @@ package body C_Backend_Tests is
       begin
          Require (Guard = "OUT_LIB_H", "hdr: guard name");
       end;
+
+      declare
+         Text : constant String :=
+           Format_C_Exe_Program (E_Tree, Test_Meta);
+      begin
+         Require (Has (Text, "int main(void)"), "exe: main");
+         Require
+           (Has (Text, "long double complex compute(void)"),
+            "exe: compute entry");
+         Require
+           (Has (Text, "long double complex z = compute();"),
+            "exe: main calls compute");
+         Require (Has (Text, "printf"), "exe: printf");
+         Require
+           (Has (Text, "static long double complex eml"),
+            "exe: static eml");
+         Require (not Has (Text, "EML_EXPORT"), "exe: no export macro");
+      end;
+
+      declare
+         Text : constant String :=
+           Format_C_Exe_Program (E_Tree, Test_Meta, "eval");
+      begin
+         Require
+           (Has (Text, "long double complex eval(void)"),
+            "exe: renamed entry");
+         Require
+           (Has (Text, "long double complex z = eval();"),
+            "exe: main calls eval");
+      end;
+
+      declare
+         Text : constant String :=
+           Format_C_Lib
+             (E_Tree, Test_Meta, "out.h", Dll_Export => True);
+      begin
+         Require (Has (Text, "EML_EXPORT"), "clib export: macro");
+         Require
+           (Has (Text, "__declspec(dllexport)"),
+            "clib export: dllexport");
+         Require
+           (Has (Text, "EML_EXPORT long double complex compute(void)"),
+            "clib export: compute prefixed");
+         Require
+           (Has (Text, "static long double complex eml"),
+            "clib export: eml still static default");
+         Require
+           (not Has (Text, "EML_EXPORT static"),
+            "clib export: no static export");
+      end;
+
+      declare
+         Hdr : constant String :=
+           Format_C_Header ("OUT_H", Dll_Export => True);
+      begin
+         Require (Has (Hdr, "EML_EXPORT"), "hdr export: macro");
+         Require
+           (Has (Hdr, "EML_EXPORT long double complex compute(void);"),
+            "hdr export: compute proto");
+      end;
    end Run;
 
 end C_Backend_Tests;

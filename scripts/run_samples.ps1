@@ -5,15 +5,29 @@
 #   pwsh -File scripts/run_samples.ps1 -Operations tokenize
 #   pwsh -File scripts/run_samples.ps1 -Operations tokenize,parse,preproc,run
 #   pwsh -File scripts/run_samples.ps1 --operations tokenize parse run
+#   pwsh -File scripts/run_samples.ps1 -Operations compile -CompileFormats exe,lib
+#   pwsh -File scripts/run_samples.ps1 --operations compile --compile-formats exe lib
+#   pwsh -File scripts/run_samples.ps1 -Operations compile -CompileInputFormats mxeml -CompileFormats exe
 #
 # -Operations / --operations: one or more of preproc, tokenize, parse,
 # compile, run. If omitted (or empty), all operations are run.
+#
+# -CompileFormats / --compile-formats: when compile is run, limit checks to
+# these eml compile -of values (e.g. beml, eml, js, c, clib, exe, lib,
+# dynamiclib, csharp, csharplib, csharpdll, csharplibdll, csharpexe, fsharp,
+# fsharplib, visualbasic, visualbasiclib, dotil, dotillib). If omitted, every
+# compile format the script normally exercises is run.
+#
+# -CompileInputFormats / --compile-input-formats: when compile is run, limit
+# checks to these input formats (mxeml, teml, eml, beml). If omitted, all four
+# are run.
 #
 # Input-format coverage:
 #   preproc  — .mxeml and .teml samples
 #   tokenize — .mxeml, .teml, and stack .eml (piped from compile)
 #   parse    — .mxeml, .teml, .eml, .beml (IR formats piped from compile)
-#   compile  — .mxeml, .teml → .beml/.eml/.js/.c/clib + .NET source/IL;
+#   compile  — .mxeml, .teml → .beml/.eml/.js/.c/clib + native exe/lib/dynamiclib
+#              when a C compiler is on PATH; .NET source/IL;
 #              csharpdll/csharplibdll/csharpexe when dotnet is on PATH
 #   run      — .mxeml, .teml, chained .eml/.beml; stdout captured, not printed
 #
@@ -27,6 +41,14 @@ param(
     [Alias("Operation")]
     [string[]] $Operations = @(),
 
+    [Parameter(Mandatory = $false)]
+    [Alias("CompileFormat")]
+    [string[]] $CompileFormats = @(),
+
+    [Parameter(Mandatory = $false)]
+    [Alias("CompileInputFormat")]
+    [string[]] $CompileInputFormats = @(),
+
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]] $RemainingArguments = @()
 )
@@ -37,6 +59,17 @@ $SamplesDir = Join-Path $Root "samples"
 $Eml = Join-Path $Root "bin" "eml"
 $ChainDir = Join-Path $Root ".results" "_chain"
 $AllOperations = @("preproc", "tokenize", "parse", "compile", "run")
+$AllCompileFormats = @(
+    "beml", "eml", "js", "c", "clib", "exe", "lib", "dynamiclib",
+    "csharp", "csharplib", "csharpdll", "csharplibdll", "csharpexe",
+    "fsharp", "fsharplib", "visualbasic", "visualbasiclib", "dotil", "dotillib"
+)
+$ChainCompileFormats = @(
+    "beml", "eml", "js", "c", "clib", "exe", "lib", "dynamiclib",
+    "csharp", "csharplib", "fsharp", "fsharplib", "visualbasic",
+    "visualbasiclib", "dotil", "dotillib"
+)
+$AllCompileInputFormats = @("mxeml", "teml", "eml", "beml")
 
 # Dummy bindings for parameterized samples; --warn none suppresses unused warnings.
 $SampleVarArgs = @(
@@ -87,6 +120,46 @@ function Get-CsharpExeOutputPath {
         return Join-Path $Directory ($BaseName + ".exe")
     }
     return Join-Path $Directory $BaseName
+}
+
+function Get-NativeExeOutputPath {
+    param(
+        [string] $Directory,
+        [string] $BaseName
+    )
+    return Get-CsharpExeOutputPath $Directory $BaseName
+}
+
+function Test-IsDarwin {
+    if ($env:OS -eq "Windows_NT") {
+        return $false
+    }
+    return (uname -s) -eq "Darwin"
+}
+
+function Get-NativeLibOutputPath {
+    param(
+        [string] $Directory,
+        [string] $BaseName
+    )
+    if ($env:OS -eq "Windows_NT") {
+        return Join-Path $Directory ($BaseName + ".lib")
+    }
+    return Join-Path $Directory ($BaseName + ".a")
+}
+
+function Get-NativeDynamiclibOutputPath {
+    param(
+        [string] $Directory,
+        [string] $BaseName
+    )
+    if ($env:OS -eq "Windows_NT") {
+        return Join-Path $Directory ($BaseName + ".dll")
+    }
+    if (Test-IsDarwin) {
+        return Join-Path $Directory ($BaseName + ".dylib")
+    }
+    return Join-Path $Directory ($BaseName + ".so")
 }
 
 function Pad-Cell {
@@ -236,10 +309,111 @@ function Expand-OperationList {
     return ,@($Expanded)
 }
 
+function Expand-CompileFormatList {
+    param([string[]] $Items)
+
+    $Expanded = [System.Collections.Generic.List[string]]::new()
+    foreach ($Item in $Items) {
+        foreach ($Part in ($Item -split ',')) {
+            $Trimmed = $Part.Trim()
+            if ($Trimmed.Length -eq 0) {
+                continue
+            }
+            if ($AllCompileFormats -notcontains $Trimmed) {
+                Write-Error "unknown compile format '$Trimmed' (expected: $($AllCompileFormats -join ', '))."
+                exit 1
+            }
+            if (-not $Expanded.Contains($Trimmed)) {
+                [void]$Expanded.Add($Trimmed)
+            }
+        }
+    }
+    return ,@($Expanded)
+}
+
+function Test-WantCompileFormat {
+    param([string] $Format)
+
+    return $null -eq $script:SelectedCompileFormats `
+        -or $script:SelectedCompileFormats -contains $Format
+}
+
+function Expand-CompileInputFormatList {
+    param([string[]] $Items)
+
+    $Expanded = [System.Collections.Generic.List[string]]::new()
+    foreach ($Item in $Items) {
+        foreach ($Part in ($Item -split ',')) {
+            $Trimmed = $Part.Trim()
+            if ($Trimmed.Length -eq 0) {
+                continue
+            }
+            if ($AllCompileInputFormats -notcontains $Trimmed) {
+                Write-Error "unknown compile input format '$Trimmed' (expected: $($AllCompileInputFormats -join ', '))."
+                exit 1
+            }
+            if (-not $Expanded.Contains($Trimmed)) {
+                [void]$Expanded.Add($Trimmed)
+            }
+        }
+    }
+    return ,@($Expanded)
+}
+
+function Test-WantCompileInputFormat {
+    param([string] $InputFormat)
+
+    return $null -eq $script:SelectedCompileInputFormats `
+        -or $script:SelectedCompileInputFormats -contains $InputFormat
+}
+
+function Test-NeedsCompileChain {
+    if (-not (Test-WantCompileInputFormat "eml") `
+        -and -not (Test-WantCompileInputFormat "beml")) {
+        return $false
+    }
+    if ($null -eq $script:SelectedCompileFormats) {
+        return $true
+    }
+    foreach ($Fmt in $ChainCompileFormats) {
+        if ($script:SelectedCompileFormats -contains $Fmt) {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Get-CompileFormatsForTable {
+    if ($null -eq $script:SelectedCompileFormats) {
+        return @(
+            "beml", "eml", "js", "c", "clib", "exe", "lib", "dynamiclib",
+            "csharp", "csharplib", "fsharp", "dotil"
+        )
+    }
+    return ,@($script:SelectedCompileFormats)
+}
+
+function Get-CompileInputFormatsForTable {
+    if ($null -eq $script:SelectedCompileInputFormats) {
+        return ,@($AllCompileInputFormats)
+    }
+    return ,@($script:SelectedCompileInputFormats)
+}
+
 # Accept unix-style: --operations tokenize parse  (or tokenize,parse)
 $Collected = [System.Collections.Generic.List[string]]::new()
 foreach ($Item in $Operations) {
     [void]$Collected.Add($Item)
+}
+
+$CompileFormatCollected = [System.Collections.Generic.List[string]]::new()
+foreach ($Item in $CompileFormats) {
+    [void]$CompileFormatCollected.Add($Item)
+}
+
+$CompileInputFormatCollected = [System.Collections.Generic.List[string]]::new()
+foreach ($Item in $CompileInputFormats) {
+    [void]$CompileInputFormatCollected.Add($Item)
 }
 
 $i = 0
@@ -253,6 +427,32 @@ while ($i -lt $RemainingArguments.Count) {
         }
         while ($i -lt $RemainingArguments.Count -and $RemainingArguments[$i] -notmatch '^-') {
             [void]$Collected.Add($RemainingArguments[$i])
+            $i++
+        }
+        continue
+    }
+
+    if ($Arg -eq "--compile-formats" -or $Arg -eq "-compile-formats") {
+        $i++
+        if ($i -ge $RemainingArguments.Count) {
+            Write-Error "missing value for --compile-formats (expected: $($AllCompileFormats -join ', '))."
+            exit 1
+        }
+        while ($i -lt $RemainingArguments.Count -and $RemainingArguments[$i] -notmatch '^-') {
+            [void]$CompileFormatCollected.Add($RemainingArguments[$i])
+            $i++
+        }
+        continue
+    }
+
+    if ($Arg -eq "--compile-input-formats" -or $Arg -eq "-compile-input-formats") {
+        $i++
+        if ($i -ge $RemainingArguments.Count) {
+            Write-Error "missing value for --compile-input-formats (expected: $($AllCompileInputFormats -join ', '))."
+            exit 1
+        }
+        while ($i -lt $RemainingArguments.Count -and $RemainingArguments[$i] -notmatch '^-') {
+            [void]$CompileInputFormatCollected.Add($RemainingArguments[$i])
             $i++
         }
         continue
@@ -273,6 +473,28 @@ if ($Collected.Count -eq 0) {
 }
 else {
     $Operations = Expand-OperationList -Items @($Collected)
+}
+
+if ($CompileFormatCollected.Count -eq 0) {
+    $script:SelectedCompileFormats = $null
+}
+else {
+    $script:SelectedCompileFormats = Expand-CompileFormatList -Items @($CompileFormatCollected)
+    if ($Operations -notcontains "compile") {
+        Write-Error "-CompileFormats / --compile-formats requires compile in -Operations."
+        exit 1
+    }
+}
+
+if ($CompileInputFormatCollected.Count -eq 0) {
+    $script:SelectedCompileInputFormats = $null
+}
+else {
+    $script:SelectedCompileInputFormats = Expand-CompileInputFormatList -Items @($CompileInputFormatCollected)
+    if ($Operations -notcontains "compile") {
+        Write-Error "-CompileInputFormats / --compile-input-formats requires compile in -Operations."
+        exit 1
+    }
 }
 
 if (-not (Test-Path -LiteralPath $Eml)) {
@@ -555,6 +777,40 @@ function Test-DotnetPresent {
     return $null -ne (Get-Command dotnet -ErrorAction SilentlyContinue)
 }
 
+function Test-CCompilerPresent {
+    foreach ($Name in @("clang", "gcc", "cl")) {
+        if ($null -ne (Get-Command $Name -ErrorAction SilentlyContinue)) {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Write-NativeCRows {
+    param(
+        [string] $InputPath,
+        [string] $Base,
+        [string] $InputFormat,
+        [string] $ResultsDir,
+        [string] $Tag,
+        [string] $CliOpts,
+        [ref] $OkCount,
+        [ref] $FailCount
+    )
+
+    $Stem = if ($Tag.Length -gt 0) { "$Base-$Tag" } else { $Base }
+    $Suffix = if ($Tag.Length -gt 0) { ".$Tag" } else { "" }
+    Write-CompileFormatRow $InputPath $Base $InputFormat "exe" `
+        (Get-NativeExeOutputPath $ResultsDir $Stem) `
+        $CliOpts $OkCount $FailCount
+    Write-CompileFormatRow $InputPath $Base $InputFormat "lib" `
+        (Get-NativeLibOutputPath $ResultsDir ($Base + $Suffix)) `
+        $CliOpts $OkCount $FailCount
+    Write-CompileFormatRow $InputPath $Base $InputFormat "dynamiclib" `
+        (Get-NativeDynamiclibOutputPath $ResultsDir ($Base + $Suffix)) `
+        $CliOpts $OkCount $FailCount
+}
+
 function Write-DotnetSourceRows {
     param(
         [string] $InputPath,
@@ -588,6 +844,10 @@ function Write-CompileFormatRow {
         [ref] $OkCount,
         [ref] $FailCount
     )
+
+    if (-not (Test-WantCompileFormat $OutputFormat)) {
+        return
+    }
 
     $Extra = @()
     if ($CliOpts.Length -gt 0) {
@@ -689,6 +949,42 @@ function Write-CompileFormatRow {
             return
         }
     }
+    elseif ($OutputFormat -eq "exe") {
+        $FailDetail = $null
+        $HdrPath = [System.IO.Path]::ChangeExtension($OutPath, ".h")
+        if (-not (Test-Path -LiteralPath $OutPath)) {
+            $FailDetail = "missing exe"
+        }
+        elseif (Test-Path -LiteralPath $HdrPath) {
+            $FailDetail = "exe should not write header"
+        }
+        if ($null -ne $FailDetail) {
+            Write-ResultRow $Base $InputFormat $OutputFormat $CliOpts $false $FailDetail
+            $FailCount.Value++
+            return
+        }
+    }
+    elseif ($OutputFormat -eq "lib" -or $OutputFormat -eq "dynamiclib") {
+        $HPath = [System.IO.Path]::ChangeExtension($OutPath, ".h")
+        $FailDetail = $null
+        if (-not (Test-Path -LiteralPath $OutPath)) {
+            $FailDetail = "missing library"
+        }
+        elseif (-not (Test-Path -LiteralPath $HPath)) {
+            $FailDetail = "missing .h"
+        }
+        else {
+            $HText = Get-Content -LiteralPath $HPath -Raw
+            if ($HText -notmatch "compute") {
+                $FailDetail = "hdr missing compute"
+            }
+        }
+        if ($null -ne $FailDetail) {
+            Write-ResultRow $Base $InputFormat $OutputFormat $CliOpts $false $FailDetail
+            $FailCount.Value++
+            return
+        }
+    }
 
     Write-ResultRow $Base $InputFormat $OutputFormat $CliOpts $true
     $OkCount.Value++
@@ -703,37 +999,44 @@ function Invoke-CompileSamples {
 
     Start-ResultTable `
         -Samples (Get-AllSampleNames) `
-        -Inputs @("mxeml", "teml", "eml", "beml") `
-        -Outputs @("beml", "eml", "js", "c", "clib", "csharp", "csharplib", "fsharp", "dotil") `
+        -Inputs (Get-CompileInputFormatsForTable) `
+        -Outputs (Get-CompileFormatsForTable) `
         -OptionsList @($CliOpts, "")
 
-    foreach ($Sample in $script:MxemlSamples) {
-        $Base = Get-SampleBaseName $Sample
-        Write-CompileFormatRow $Sample.FullName $Base "mxeml" "beml" `
-            (Join-Path $ResultsDir ($Base + ".beml")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
-        Write-CompileFormatRow $Sample.FullName $Base "mxeml" "eml" `
-            (Join-Path $ResultsDir ($Base + ".eml")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
-        if ($Sample.Name -notmatch 'taylor') {
-            Write-CompileFormatRow $Sample.FullName $Base "mxeml" "js" `
-                (Join-Path $ResultsDir ($Base + ".js")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
-            Write-CompileFormatRow $Sample.FullName $Base "mxeml" "c" `
-                (Join-Path $ResultsDir ($Base + ".c")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
-            Write-CompileFormatRow $Sample.FullName $Base "mxeml" "clib" `
-                (Join-Path $ResultsDir ($Base + ".clib.c")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
-            Write-DotnetSourceRows $Sample.FullName $Base "mxeml" $ResultsDir "mxeml" `
-                $CliOpts ([ref]$OkCount) ([ref]$FailCount)
-            if (Test-DotnetPresent) {
-                Write-CompileFormatRow $Sample.FullName $Base "mxeml" "csharpdll" `
-                    (Join-Path $ResultsDir ($Base + ".dll")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
-                Write-CompileFormatRow $Sample.FullName $Base "mxeml" "csharplibdll" `
-                    (Join-Path $ResultsDir ($Base + ".lib.dll")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
-                Write-CompileFormatRow $Sample.FullName $Base "mxeml" "csharpexe" `
-                    (Get-CsharpExeOutputPath $ResultsDir $Base) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+    if (Test-WantCompileInputFormat "mxeml") {
+        foreach ($Sample in $script:MxemlSamples) {
+            $Base = Get-SampleBaseName $Sample
+            Write-CompileFormatRow $Sample.FullName $Base "mxeml" "beml" `
+                (Join-Path $ResultsDir ($Base + ".beml")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+            Write-CompileFormatRow $Sample.FullName $Base "mxeml" "eml" `
+                (Join-Path $ResultsDir ($Base + ".eml")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+            if ($Sample.Name -notmatch 'taylor') {
+                Write-CompileFormatRow $Sample.FullName $Base "mxeml" "js" `
+                    (Join-Path $ResultsDir ($Base + ".js")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+                Write-CompileFormatRow $Sample.FullName $Base "mxeml" "c" `
+                    (Join-Path $ResultsDir ($Base + ".c")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+                Write-CompileFormatRow $Sample.FullName $Base "mxeml" "clib" `
+                    (Join-Path $ResultsDir ($Base + ".clib.c")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+                if (Test-CCompilerPresent) {
+                    Write-NativeCRows $Sample.FullName $Base "mxeml" $ResultsDir "" `
+                        $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+                }
+                Write-DotnetSourceRows $Sample.FullName $Base "mxeml" $ResultsDir "mxeml" `
+                    $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+                if (Test-DotnetPresent) {
+                    Write-CompileFormatRow $Sample.FullName $Base "mxeml" "csharpdll" `
+                        (Join-Path $ResultsDir ($Base + ".dll")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+                    Write-CompileFormatRow $Sample.FullName $Base "mxeml" "csharplibdll" `
+                        (Join-Path $ResultsDir ($Base + ".lib.dll")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+                    Write-CompileFormatRow $Sample.FullName $Base "mxeml" "csharpexe" `
+                        (Get-CsharpExeOutputPath $ResultsDir $Base) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+                }
             }
         }
     }
 
-    foreach ($Sample in $script:TemlSamples) {
+    if (Test-WantCompileInputFormat "teml") {
+        foreach ($Sample in $script:TemlSamples) {
         $Base = Get-SampleBaseName $Sample
         Write-CompileFormatRow $Sample.FullName $Base "teml" "beml" `
             (Join-Path $ResultsDir ($Base + ".beml")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
@@ -745,6 +1048,10 @@ function Invoke-CompileSamples {
             (Join-Path $ResultsDir ($Base + ".c")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
         Write-CompileFormatRow $Sample.FullName $Base "teml" "clib" `
             (Join-Path $ResultsDir ($Base + ".clib.c")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+        if (Test-CCompilerPresent) {
+            Write-NativeCRows $Sample.FullName $Base "teml" $ResultsDir "teml" `
+                $CliOpts ([ref]$OkCount) ([ref]$FailCount)
+        }
         Write-DotnetSourceRows $Sample.FullName $Base "teml" $ResultsDir "teml" `
             $CliOpts ([ref]$OkCount) ([ref]$FailCount)
         if (Test-DotnetPresent) {
@@ -755,38 +1062,53 @@ function Invoke-CompileSamples {
             Write-CompileFormatRow $Sample.FullName $Base "teml" "csharpexe" `
                 (Get-CsharpExeOutputPath $ResultsDir ($Base + "-teml")) $CliOpts ([ref]$OkCount) ([ref]$FailCount)
         }
+        }
     }
 
-    $null = Ensure-ChainArtifacts
+    if (Test-NeedsCompileChain) {
+        $null = Ensure-ChainArtifacts
 
-    $EmlFiles = @(Get-ChildItem -LiteralPath $script:ChainDir -Filter "*.eml" | Sort-Object Name)
-    foreach ($File in $EmlFiles) {
-        $Base = Get-SampleBaseName $File
-        Write-CompileFormatRow $File.FullName $Base "eml" "beml" `
-            (Join-Path $ResultsDir ($Base + ".from_eml.beml")) "" ([ref]$OkCount) ([ref]$FailCount)
-        Write-CompileFormatRow $File.FullName $Base "eml" "js" `
-            (Join-Path $ResultsDir ($Base + ".from_eml.js")) "" ([ref]$OkCount) ([ref]$FailCount)
-        Write-CompileFormatRow $File.FullName $Base "eml" "c" `
-            (Join-Path $ResultsDir ($Base + ".from_eml.c")) "" ([ref]$OkCount) ([ref]$FailCount)
-        Write-CompileFormatRow $File.FullName $Base "eml" "clib" `
-            (Join-Path $ResultsDir ($Base + ".from_eml.clib.c")) "" ([ref]$OkCount) ([ref]$FailCount)
-        Write-DotnetSourceRows $File.FullName $Base "eml" $ResultsDir "from_eml" `
-            "" ([ref]$OkCount) ([ref]$FailCount)
-    }
+        if (Test-WantCompileInputFormat "eml") {
+            $EmlFiles = @(Get-ChildItem -LiteralPath $script:ChainDir -Filter "*.eml" | Sort-Object Name)
+            foreach ($File in $EmlFiles) {
+            $Base = Get-SampleBaseName $File
+            Write-CompileFormatRow $File.FullName $Base "eml" "beml" `
+                (Join-Path $ResultsDir ($Base + ".from_eml.beml")) "" ([ref]$OkCount) ([ref]$FailCount)
+            Write-CompileFormatRow $File.FullName $Base "eml" "js" `
+                (Join-Path $ResultsDir ($Base + ".from_eml.js")) "" ([ref]$OkCount) ([ref]$FailCount)
+            Write-CompileFormatRow $File.FullName $Base "eml" "c" `
+                (Join-Path $ResultsDir ($Base + ".from_eml.c")) "" ([ref]$OkCount) ([ref]$FailCount)
+            Write-CompileFormatRow $File.FullName $Base "eml" "clib" `
+                (Join-Path $ResultsDir ($Base + ".from_eml.clib.c")) "" ([ref]$OkCount) ([ref]$FailCount)
+            if (Test-CCompilerPresent) {
+                Write-NativeCRows $File.FullName $Base "eml" $ResultsDir "from_eml" `
+                    "" ([ref]$OkCount) ([ref]$FailCount)
+            }
+            Write-DotnetSourceRows $File.FullName $Base "eml" $ResultsDir "from_eml" `
+                "" ([ref]$OkCount) ([ref]$FailCount)
+            }
+        }
 
-    $BemlFiles = @(Get-ChildItem -LiteralPath $script:ChainDir -Filter "*.beml" | Sort-Object Name)
-    foreach ($File in $BemlFiles) {
-        $Base = Get-SampleBaseName $File
-        Write-CompileFormatRow $File.FullName $Base "beml" "eml" `
-            (Join-Path $ResultsDir ($Base + ".from_beml.eml")) "" ([ref]$OkCount) ([ref]$FailCount)
-        Write-CompileFormatRow $File.FullName $Base "beml" "js" `
-            (Join-Path $ResultsDir ($Base + ".from_beml.js")) "" ([ref]$OkCount) ([ref]$FailCount)
-        Write-CompileFormatRow $File.FullName $Base "beml" "c" `
-            (Join-Path $ResultsDir ($Base + ".from_beml.c")) "" ([ref]$OkCount) ([ref]$FailCount)
-        Write-CompileFormatRow $File.FullName $Base "beml" "clib" `
-            (Join-Path $ResultsDir ($Base + ".from_beml.clib.c")) "" ([ref]$OkCount) ([ref]$FailCount)
-        Write-DotnetSourceRows $File.FullName $Base "beml" $ResultsDir "from_beml" `
-            "" ([ref]$OkCount) ([ref]$FailCount)
+        if (Test-WantCompileInputFormat "beml") {
+            $BemlFiles = @(Get-ChildItem -LiteralPath $script:ChainDir -Filter "*.beml" | Sort-Object Name)
+            foreach ($File in $BemlFiles) {
+            $Base = Get-SampleBaseName $File
+            Write-CompileFormatRow $File.FullName $Base "beml" "eml" `
+                (Join-Path $ResultsDir ($Base + ".from_beml.eml")) "" ([ref]$OkCount) ([ref]$FailCount)
+            Write-CompileFormatRow $File.FullName $Base "beml" "js" `
+                (Join-Path $ResultsDir ($Base + ".from_beml.js")) "" ([ref]$OkCount) ([ref]$FailCount)
+            Write-CompileFormatRow $File.FullName $Base "beml" "c" `
+                (Join-Path $ResultsDir ($Base + ".from_beml.c")) "" ([ref]$OkCount) ([ref]$FailCount)
+            Write-CompileFormatRow $File.FullName $Base "beml" "clib" `
+                (Join-Path $ResultsDir ($Base + ".from_beml.clib.c")) "" ([ref]$OkCount) ([ref]$FailCount)
+            if (Test-CCompilerPresent) {
+                Write-NativeCRows $File.FullName $Base "beml" $ResultsDir "from_beml" `
+                    "" ([ref]$OkCount) ([ref]$FailCount)
+            }
+            Write-DotnetSourceRows $File.FullName $Base "beml" $ResultsDir "from_beml" `
+                "" ([ref]$OkCount) ([ref]$FailCount)
+            }
+        }
     }
 
     $Total = $OkCount + $FailCount

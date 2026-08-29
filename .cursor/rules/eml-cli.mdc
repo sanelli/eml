@@ -172,7 +172,7 @@ Usage:
   eml preproc [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo] [--output-format|-of mxeml|teml]
   eml tokenize [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo] [--output-format|-of tokens]
   eml parse [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo] [--output-format|-of mermaid|md|dot|svg]
-  eml compile [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo] [--output-format|-of eml|beml|js|c|clib|csharp|csharplib|csharpdll|csharplibdll|csharpexe|fsharp|fsharplib|visualbasic|visualbasiclib|dotil|dotillib] [--function-name|-fn NAME] [--framework TFM] [--no-companion-project] [--emit-eml]
+  eml compile [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--output|-o <file>] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo] [--output-format|-of eml|beml|js|c|clib|exe|lib|dynamiclib|csharp|csharplib|csharpdll|csharplibdll|csharpexe|fsharp|fsharplib|visualbasic|visualbasiclib|dotil|dotillib] [--function-name|-fn NAME] [--framework TFM] [--no-companion-project] [--emit-eml]
   eml run [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--var|-v $NAME=EXPR]... [--warn|-w default|none|error] [--no-color] [--no-logo]
 Try 'eml help' for more information.
 ```
@@ -247,11 +247,11 @@ eml compile [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--outp
 
 - Effective input may be any of the four formats
 - `-o` / `--output` — optional; extension must match `--output-format` (default `beml` → `.beml`); omit → stdout. DLL/exe formats require `-o`
-- `--output-format` / `-of` — optional; default `beml`; values `eml`, `beml`, `js`, `c`, `clib`, `csharp`, `csharplib`, `csharpdll`, `csharplibdll`, `csharpexe`, `fsharp`, `fsharplib`, `visualbasic`, `visualbasiclib`, `dotil`, `dotillib`
-- `--function-name` / `-fn NAME` — optional; `-of js` (default `main`), `-of clib` (default `compute`), or any .NET `-of` in this list (default `Compute`). Identifier: letter/`_` then alnum/`_`. Reject a case-insensitive match for `eml` or `Main`
+- `--output-format` / `-of` — optional; default `beml`; values `eml`, `beml`, `js`, `c`, `clib`, `exe`, `lib`, `dynamiclib`, `csharp`, `csharplib`, `csharpdll`, `csharplibdll`, `csharpexe`, `fsharp`, `fsharplib`, `visualbasic`, `visualbasiclib`, `dotil`, `dotillib`
+- `--function-name` / `-fn NAME` — optional; `-of js` (default `main`), `-of clib` / `exe` / `lib` / `dynamiclib` (default `compute`), or any .NET `-of` in this list (default `Compute`). Identifier: letter/`_` then alnum/`_`. Reject a case-insensitive match for `eml` or `Main`
 - `--framework TFM` — long form only (no `-f`); space-separated; default `net8.0`; lowercase required. Program formats (`csharp`, `csharpdll`, `csharpexe`, `fsharp`, `visualbasic`, `dotil`): `net` + digits + `.0`. Library formats (`csharplib`, `csharplibdll`, `fsharplib`, `visualbasiclib`, `dotillib`): that set plus `netstandard2.0` / `netstandard2.1`. Invalid on other `-of` and non-`compile` commands. Repeated flag is invalid CLI
-- `--no-companion-project` — skip companion `.csproj` / `.fsproj` / `.vbproj` when `-o` is set. Meaningful for `csharp`, `csharplib`, `fsharp`, `fsharplib`, `visualbasic`, `visualbasiclib` only. Invalid on DLL/exe/IL/js/c/clib/eml/beml. Repeated is invalid CLI
-- `--emit-eml` — optional switch; only with `-of clib`; when set, declare `eml` in the companion `.h` (otherwise omit from `.h` and keep `eml` `static` in `.c`)
+- `--no-companion-project` — skip companion `.csproj` / `.fsproj` / `.vbproj` when `-o` is set. Meaningful for `csharp`, `csharplib`, `fsharp`, `fsharplib`, `visualbasic`, `visualbasiclib` only. Invalid on DLL/exe/IL/js/c/clib/exe/lib/dynamiclib/eml/beml. Repeated is invalid CLI
+- `--emit-eml` — optional switch; only with `-of clib`, `lib`, or `dynamiclib`; when set, declare `eml` in the companion `.h` (otherwise omit from `.h` and keep `eml` `static` in `.c`)
 - `--var` / `--warn` / `--no-color` / `--no-logo` — same shared rules
 - Flag order free; space-separated only (no `--output-format=`)
 - Repeated `--output-format`, `-fn`, `--framework`, `--no-companion-project`, or `--emit-eml` is invalid CLI
@@ -275,6 +275,9 @@ Output extension must match format:
 | `js` | `.js` |
 | `c` | `.c` |
 | `clib` | `.c` |
+| `exe` | `.exe` on Windows; no extension on Linux/macOS |
+| `lib` | `.lib` on Windows; `.a` on Linux/macOS |
+| `dynamiclib` | `.dll` on Windows; `.dylib` on macOS; `.so` on Linux |
 | `csharp` / `csharplib` | `.cs` |
 | `csharpdll` / `csharplibdll` | `.dll` |
 | `csharpexe` | `.exe` on Windows; no extension on Linux/macOS |
@@ -300,6 +303,24 @@ Output extension must match format:
 - With `--emit-eml`: `eml` is non-static in the `.c` and declared in the `.h`
 - When `-o` is set, also writes a companion `.h` (same basename) with include guard, `#include <complex.h>`, and the entry prototype (plus `eml` iff `--emit-eml`); the `.c` `#include`s that header by simple name
 - Without `-o`, only the `.c` goes to stdout (include name `eml_generated.h`; no header file written)
+
+### Native C exe (`-of exe`)
+
+- Emits C with `static eml`, named entry (`compute` or `-fn`), and `main` that prints the result; invokes **clang**, else **gcc**, else **`cl.exe`** (Windows only)
+- Requires `-o`; extension rules match `csharpexe`
+- `--emit-eml` / `--framework` / `--no-companion-project` are invalid
+
+### Native C static lib (`-of lib`)
+
+- Emits clib-style C, invokes clang/gcc/cl to produce `.a` (Linux/macOS) or `.lib` (Windows)
+- Requires `-o`; writes companion `.h` beside the library artifact
+- `-fn` and `--emit-eml` same as `clib`
+
+### Native C shared lib (`-of dynamiclib`)
+
+- Emits clib-style C with Windows export macros, invokes clang/gcc/cl to produce `.so` / `.dylib` / `.dll`
+- Requires `-o`; writes companion `.h` beside the library artifact
+- `-fn` and `--emit-eml` same as `clib`
 
 ### C# source (`-of csharp` / `csharplib`)
 
@@ -347,6 +368,9 @@ eml compile -i f.mxeml -of js -fn run -o out.js
 eml compile -i f.mxeml -of c -o out.c
 eml compile -i f.mxeml -of clib -o out.c
 eml compile -i f.mxeml -of clib -fn eval --emit-eml -o out.c
+eml compile -i f.mxeml -of exe -o out
+eml compile -i f.mxeml -of lib -o out.a
+eml compile -i f.mxeml -of dynamiclib -o out.dylib
 eml compile -i f.mxeml -of csharp -o out.cs
 eml compile -i f.mxeml -of csharpdll -o out.dll
 eml compile -i f.mxeml -of csharpexe -o out.exe

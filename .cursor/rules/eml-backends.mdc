@@ -14,6 +14,9 @@ All backends consume **IR EML** (never the source AST directly).
 | **JavaScript `.js`** | Nested `eml(...)` browser script + companion `.html` (`eml compile -of js`); uses math.js CDN for complex `exp`/`log` |
 | **C program `.c`** | Standalone C with `main` using `<complex.h>` / `long double complex` (`eml compile -of c`) |
 | **C library `.c`+`.h`** | `eml` + `compute` library sources (`eml compile -of clib`; companion `.h` when `-o`) |
+| **Native exe** | IR → C → clang/gcc/cl (`-of exe`; `-o` `.exe` on Windows, no extension elsewhere) |
+| **Native static lib** | IR → clib C → `.a` / `.lib` (`-of lib`; companion `.h`) |
+| **Native shared lib** | IR → clib C → `.so` / `.dylib` / `.dll` (`-of dynamiclib`; companion `.h`) |
 | **C# source** | Nested `eml(...)` with `System.Numerics.Complex` (`-of csharp` / `csharplib`; companion `.csproj` when `-o`) |
 | **C# DLL** | `dotnet build -c Release` of generated C# (`-of csharpdll` / `csharplibdll`; requires `-o` `.dll`) |
 | **C# exe** | `dotnet publish` single-file, framework-dependent for the current OS (`-of csharpexe`; `-o` is `.exe` on Windows, no extension on Linux/macOS) |
@@ -24,7 +27,7 @@ All backends consume **IR EML** (never the source AST directly).
 
 .NET backends may call the host language’s `exp` / `log` (and other math) instead of expanding everything to a single opcode. The JS backend defines `eml` with math.js (`math.exp` / `math.log`) and nests calls from the IR tree (no Flatten). The C backends define `eml` with `cexpl` / `clogl` on `long double complex` and nest the same IR tree. C# / F# / VB / IL define `eml` as `Complex.Exp(x) - Complex.Log(y)` and nest the IR tree.
 
-`eml compile --output-format` / `-of` currently supports `eml` (textual stack IR), `beml` (binary stack IR), `js` (browser JavaScript + companion HTML when `-o` is set), `c` (standalone C program), `clib` (C library `.c` + companion `.h` when `-o` is set), `csharp` / `csharplib` (C# source + companion `.csproj` when `-o`), `csharpdll` / `csharplibdll` (`dotnet build` → `.dll`), `csharpexe` (`dotnet publish -r <host-rid>` → `.exe` on Windows, extensionless on Linux/macOS), `fsharp` / `fsharplib`, `visualbasic` / `visualbasiclib`, and `dotil` / `dotillib`. `--format` / `-f` is removed. Future `-of` values: **`wasm`** → WebAssembly binary, **`wat`** → textual WebAssembly. Same-format compile (`eml`→`eml`, `beml`→`beml`) is rejected. See `eml-cli`.
+`eml compile --output-format` / `-of` currently supports `eml` (textual stack IR), `beml` (binary stack IR), `js` (browser JavaScript + companion HTML when `-o` is set), `c` (standalone C program), `clib` (C library `.c` + companion `.h` when `-o` is set), `exe` (native executable via clang/gcc/cl), `lib` (static `.a` / `.lib` + companion `.h`), `dynamiclib` (shared `.so` / `.dylib` / `.dll` + companion `.h`), `csharp` / `csharplib` (C# source + companion `.csproj` when `-o`), `csharpdll` / `csharplibdll` (`dotnet build` → `.dll`), `csharpexe` (`dotnet publish -r <host-rid>` → `.exe` on Windows, extensionless on Linux/macOS), `fsharp` / `fsharplib`, `visualbasic` / `visualbasiclib`, and `dotil` / `dotillib`. `--format` / `-f` is removed. Future `-of` values: **`wasm`** → WebAssembly binary, **`wat`** → textual WebAssembly. Same-format compile (`eml`→`eml`, `beml`→`beml`) is rejected. See `eml-cli`.
 
 ## Not yet specified
 

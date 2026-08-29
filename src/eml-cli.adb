@@ -18,6 +18,7 @@ with Interpreter;
 with IR_Eml;
 with Js_Backend;
 with C_Backend;
+with C_Build;
 with Dotnet_Backend;
 with Dotnet_Build;
 with Fsharp_Backend;
@@ -51,6 +52,9 @@ package body Eml.CLI is
       Javascript,
       C_Program,
       C_Lib,
+      Native_Exe,
+      Native_Lib,
+      Native_Dynamiclib,
       CSharp,
       CSharp_Lib,
       CSharp_Dll,
@@ -68,7 +72,7 @@ package body Eml.CLI is
    Empty_Stream : constant Ada.Streams.Stream_Element_Array (1 .. 0) := [];
 
    Compile_Of_List : constant String :=
-     "eml|beml|js|c|clib|csharp|csharplib|csharpdll|"
+     "eml|beml|js|c|clib|exe|lib|dynamiclib|csharp|csharplib|csharpdll|"
      & "csharplibdll|csharpexe|fsharp|fsharplib|"
      & "visualbasic|visualbasiclib|dotil|dotillib";
 
@@ -139,6 +143,24 @@ package body Eml.CLI is
         or else Fmt = CSharp_Exe;
    end Compile_Fmt_Requires_Dotnet;
 
+   function Compile_Fmt_Requires_Native_C (Fmt : Compile_Output_Format)
+      return Boolean
+   is
+   begin
+      return Fmt = Native_Exe
+        or else Fmt = Native_Lib
+        or else Fmt = Native_Dynamiclib;
+   end Compile_Fmt_Requires_Native_C;
+
+   function Compile_Fmt_Allows_Emit_Eml (Fmt : Compile_Output_Format)
+      return Boolean
+   is
+   begin
+      return Fmt = C_Lib
+        or else Fmt = Native_Lib
+        or else Fmt = Native_Dynamiclib;
+   end Compile_Fmt_Allows_Emit_Eml;
+
    function Compile_Fmt_Allows_Framework (Fmt : Compile_Output_Format)
       return Boolean
    is
@@ -171,7 +193,8 @@ package body Eml.CLI is
    is
    begin
       case Fmt is
-         when Javascript | C_Lib | CSharp | CSharp_Lib | CSharp_Dll
+         when Javascript | C_Lib | Native_Exe | Native_Lib
+           | Native_Dynamiclib | CSharp | CSharp_Lib | CSharp_Dll
            | CSharp_Lib_Dll | CSharp_Exe | FSharp | FSharp_Lib
            | Visual_Basic | Visual_Basic_Lib | Dot_Il | Dot_Il_Lib =>
             return True;
@@ -192,7 +215,7 @@ package body Eml.CLI is
       case Fmt is
          when Javascript =>
             return Js_Backend.Default_Function_Name;
-         when C_Lib =>
+         when C_Lib | Native_Exe | Native_Lib | Native_Dynamiclib =>
             return C_Backend.Default_Lib_Function_Name;
          when others =>
             return Dotnet_Backend.Default_Function_Name;
@@ -491,16 +514,16 @@ package body Eml.CLI is
         ("  --output-format, -of FMT    beml (default), eml, js, c, "
          & "clib, or .NET formats");
       Put_Stdout
-        ("  --function-name, -fn NAME   Entry for js (main), clib "
-         & "(compute), or .NET (Compute)");
+        ("  --function-name, -fn NAME   Entry for js (main), clib/lib "
+         & "(compute), exe (compute), or .NET (Compute)");
       Put_Stdout
         ("  --framework TFM             Target framework (default net8.0)");
       Put_Stdout
         ("  --no-companion-project      Skip .csproj/.fsproj/.vbproj "
          & "when -o is set");
       Put_Stdout
-        ("  --emit-eml                  With -of clib, declare eml "
-         & "in the companion .h");
+        ("  --emit-eml                  With -of clib/lib/dynamiclib, "
+         & "declare eml in the companion .h");
       Put_Stdout
         ("  --var, -v $NAME=EXPR        Preprocessor binding "
          & "(mxeml/teml only)");
@@ -512,6 +535,13 @@ package body Eml.CLI is
       Put_Stdout ("  c    -> .c (standalone program with main)");
       Put_Stdout
         ("  clib -> .c (writes companion .h; compute by default)");
+      Put_Stdout
+        ("  exe  -> host executable (requires -o; clang/gcc/cl)");
+      Put_Stdout
+        ("  lib  -> static library .a/.lib (requires -o; "
+         & "companion .h)");
+      Put_Stdout
+        ("  dynamiclib -> .so/.dylib/.dll (requires -o; companion .h)");
       Put_Stdout ("  csharp/csharplib -> .cs (+ .csproj when -o)");
       Put_Stdout
         ("  csharpdll/csharplibdll -> .dll (requires -o; "
@@ -534,9 +564,15 @@ package body Eml.CLI is
       Put_Stdout
         ("csharpdll, csharplibdll, and csharpexe require -o "
          & "and the dotnet SDK.");
+      Put_Stdout
+        ("exe, lib, and dynamiclib require -o and a C compiler "
+         & "(clang, gcc, or cl on Windows).");
       Put_Stdout ("");
       Put_Stdout ("Examples:");
       Put_Stdout ("  eml compile -i filename.mxeml -o other.beml");
+      Put_Stdout ("  eml compile -i f.mxeml -of exe -o out");
+      Put_Stdout ("  eml compile -i f.mxeml -of lib -o out.a");
+      Put_Stdout ("  eml compile -i f.mxeml -of dynamiclib -o out.dylib");
       Put_Stdout ("  eml compile -i f.mxeml -of csharp -o out.cs");
       Put_Stdout ("  eml compile -i f.mxeml -of csharplib -fn Eval -o out.cs");
       Put_Stdout
@@ -901,6 +937,12 @@ package body Eml.CLI is
          return C_Program;
       elsif S = "clib" then
          return C_Lib;
+      elsif S = "exe" then
+         return Native_Exe;
+      elsif S = "lib" then
+         return Native_Lib;
+      elsif S = "dynamiclib" then
+         return Native_Dynamiclib;
       elsif S = "csharp" then
          return CSharp;
       elsif S = "csharplib" then
@@ -936,6 +978,15 @@ package body Eml.CLI is
          when Beml_Binary    => return ".beml";
          when Javascript     => return ".js";
          when C_Program | C_Lib => return ".c";
+         when Native_Exe =>
+            if C_Build.Host_Is_Windows then
+               return ".exe";
+            else
+               return "";
+            end if;
+         when Native_Lib => return C_Build.Native_Lib_Expected_Suffix;
+         when Native_Dynamiclib =>
+            return C_Build.Native_Dynamiclib_Expected_Suffix;
          when CSharp | CSharp_Lib => return ".cs";
          when CSharp_Dll | CSharp_Lib_Dll => return ".dll";
          when CSharp_Exe =>
@@ -950,6 +1001,42 @@ package body Eml.CLI is
       end case;
    end Compile_Extension;
 
+   function Compile_Expected_Suffix
+     (Fmt : Compile_Output_Format) return String
+   is
+   begin
+      case Fmt is
+         when CSharp_Exe =>
+            return Dotnet_Build.Csharp_Exe_Expected_Suffix;
+         when Native_Exe =>
+            return C_Build.Native_Exe_Expected_Suffix;
+         when Native_Lib =>
+            return C_Build.Native_Lib_Expected_Suffix;
+         when Native_Dynamiclib =>
+            return C_Build.Native_Dynamiclib_Expected_Suffix;
+         when others =>
+            return Compile_Extension (Fmt);
+      end case;
+   end Compile_Expected_Suffix;
+
+   function Compile_Output_Path_Matches
+     (Fmt : Compile_Output_Format; Path : String) return Boolean
+   is
+   begin
+      case Fmt is
+         when CSharp_Exe =>
+            return Dotnet_Build.Csharp_Exe_Path_Matches (Path);
+         when Native_Exe =>
+            return C_Build.Native_Exe_Path_Matches (Path);
+         when Native_Lib =>
+            return C_Build.Native_Lib_Path_Matches (Path);
+         when Native_Dynamiclib =>
+            return C_Build.Native_Dynamiclib_Path_Matches (Path);
+         when others =>
+            return Ends_With (Path, Compile_Extension (Fmt));
+      end case;
+   end Compile_Output_Path_Matches;
+
    function Compile_Format_Image (Fmt : Compile_Output_Format) return String is
    begin
       case Fmt is
@@ -958,6 +1045,9 @@ package body Eml.CLI is
          when Javascript     => return "js";
          when C_Program      => return "c";
          when C_Lib          => return "clib";
+         when Native_Exe     => return "exe";
+         when Native_Lib     => return "lib";
+         when Native_Dynamiclib => return "dynamiclib";
          when CSharp         => return "csharp";
          when CSharp_Lib     => return "csharplib";
          when CSharp_Dll     => return "csharpdll";
@@ -1588,6 +1678,8 @@ package body Eml.CLI is
             end if;
          when CSharp_Dll | CSharp_Lib_Dll | CSharp_Exe =>
             null;
+         when Native_Exe | Native_Lib | Native_Dynamiclib =>
+            null;
          when FSharp =>
             if Has_Output then
                Fsharp_Backend.Write_FSharp_Program_To_File
@@ -1843,6 +1935,46 @@ package body Eml.CLI is
                     (CLI_Dotnet_Build_Failed,
                      Use_Color,
                      "unknown error");
+               end if;
+               return Ada.Command_Line.Failure;
+            end if;
+         end;
+         return Ada.Command_Line.Success;
+      end if;
+
+      if Compile_Fmt_Requires_Native_C (Fmt) then
+         if not C_Build.C_Compiler_On_Path then
+            Fail_CLI (CLI_C_Compiler_Not_Found, Use_Color);
+            return Ada.Command_Line.Failure;
+         end if;
+         declare
+            Build_R : C_Build.Build_Result;
+         begin
+            case Fmt is
+               when Native_Exe =>
+                  Build_R :=
+                    C_Build.Build_Native_Exe
+                      (Root, Meta, Output_Path, Fn);
+               when Native_Lib =>
+                  Build_R :=
+                    C_Build.Build_Native_Lib
+                      (Root, Meta, Output_Path, Fn, Emit_Eml);
+               when Native_Dynamiclib =>
+                  Build_R :=
+                    C_Build.Build_Native_Dynamiclib
+                      (Root, Meta, Output_Path, Fn, Emit_Eml);
+               when others =>
+                  raise Program_Error;
+            end case;
+            if not Build_R.Ok then
+               if Build_R.Error_Length > 0 then
+                  Fail_CLI
+                    (CLI_C_Compile_Failed,
+                     Use_Color,
+                     Build_R.Error_Text (1 .. Build_R.Error_Length));
+               else
+                  Fail_CLI
+                    (CLI_C_Compile_Failed, Use_Color, "unknown error");
                end if;
                return Ada.Command_Line.Failure;
             end if;
@@ -2711,7 +2843,9 @@ package body Eml.CLI is
             return Ada.Command_Line.Failure;
          end if;
 
-         if Have_Emit_Eml and then Compile_Fmt /= C_Lib then
+         if Have_Emit_Eml
+           and then not Compile_Fmt_Allows_Emit_Eml (Compile_Fmt)
+         then
             Fail_CLI (CLI_Emit_Eml_Not_Allowed, Use_Color);
             return Ada.Command_Line.Failure;
          end if;
@@ -2730,7 +2864,9 @@ package body Eml.CLI is
             return Ada.Command_Line.Failure;
          end if;
 
-         if Compile_Fmt_Requires_Dotnet (Compile_Fmt) and then not Have_Output
+         if (Compile_Fmt_Requires_Dotnet (Compile_Fmt)
+              or else Compile_Fmt_Requires_Native_C (Compile_Fmt))
+           and then not Have_Output
          then
             Fail_CLI
               (CLI_Dll_Requires_Output,
@@ -2779,13 +2915,9 @@ package body Eml.CLI is
             declare
                Path     : constant String := To_String (Output_Path);
                Matches  : constant Boolean :=
-                 (if Compile_Fmt = CSharp_Exe then
-                    Dotnet_Build.Csharp_Exe_Path_Matches (Path)
-                  else Ends_With (Path, Compile_Extension (Compile_Fmt)));
+                 Compile_Output_Path_Matches (Compile_Fmt, Path);
                Expected : constant String :=
-                 (if Compile_Fmt = CSharp_Exe then
-                    Dotnet_Build.Csharp_Exe_Expected_Suffix
-                  else Compile_Extension (Compile_Fmt));
+                 Compile_Expected_Suffix (Compile_Fmt);
             begin
                if not Matches then
                   Fail_CLI

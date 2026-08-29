@@ -16,6 +16,7 @@ with Interpreter_Tests;
 with IR_Eml_Tests;
 with Js_Backend_Tests;
 with C_Backend_Tests;
+with C_Build_Tests;
 with Dotnet_Backend_Tests;
 with Fsharp_Backend_Tests;
 with Vb_Backend_Tests;
@@ -36,6 +37,7 @@ begin
    Interpreter_Tests.Run (Failed);
    Js_Backend_Tests.Run (Failed);
    C_Backend_Tests.Run (Failed);
+   C_Build_Tests.Run (Failed);
    Dotnet_Backend_Tests.Run (Failed);
    Fsharp_Backend_Tests.Run (Failed);
    Vb_Backend_Tests.Run (Failed);

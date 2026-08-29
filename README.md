@@ -72,6 +72,14 @@ flowchart TD
   irNode --> writeClib["compile -of clib"]
   writeClib --> cLib[".c eml+compute"]
   cLib --> cHdr[".h companion when -o"]
+  irNode --> writeNativeExe["compile -of exe"]
+  writeNativeExe --> nativeExe["host exe via clang/gcc/cl"]
+  irNode --> writeNativeLib["compile -of lib"]
+  writeNativeLib --> nativeLib[".a/.lib static"]
+  nativeLib --> nativeLibHdr[".h companion"]
+  irNode --> writeNativeDyn["compile -of dynamiclib"]
+  writeNativeDyn --> nativeDyn[".so/.dylib/.dll"]
+  nativeDyn --> nativeDynHdr[".h companion"]
   irNode --> writeCs["compile -of csharp / csharplib"]
   writeCs --> csFile[".cs + .csproj when -o"]
   irNode --> writeCsDll["compile -of csharpdll / csharplibdll"]
@@ -94,7 +102,12 @@ opcodes and evaluates on a complex stack (no output file). `-of js` walks the
 IR tree into nested `eml(...)` calls (no Flatten) and, with `-o`, writes a
 companion `.html` that loads math.js and the generated script. `-of c` emits a
 standalone C program (`<complex.h>`, `long double complex`); `-of clib` emits
-a library `.c` and, with `-o`, a companion `.h` (`eml` + `compute`). C# / F# /
+a library `.c` and, with `-o`, a companion `.h` (`eml` + `compute`). `-of exe`
+invokes a native C compiler (clang, then gcc, then `cl.exe` on Windows) and
+requires `-o` ending in `.exe` on Windows, or a name with no extension on
+Linux/macOS. `-of lib` builds a static library (`.a` on Linux/macOS, `.lib` on
+Windows) and writes a companion `.h`. `-of dynamiclib` builds a shared library
+(`.so`, `.dylib`, or `.dll`) and writes a companion `.h`. C# / F# /
 VB source formats write nested `eml(...)` using `System.Numerics.Complex`;
 with `-o` they also write a companion project file unless
 `--no-companion-project`. `-of csharpdll` / `csharplibdll` invoke
@@ -173,6 +186,11 @@ binaries:
 ./bin/eml compile -i f.mxeml -of js -o out.js
 ./bin/eml compile -i f.mxeml -of c -o out.c
 ./bin/eml compile -i f.mxeml -of clib -o out.c
+./bin/eml compile -i f.mxeml -of exe -o out          # Linux / macOS
+./bin/eml compile -i f.mxeml -of exe -o out.exe      # Windows
+./bin/eml compile -i f.mxeml -of lib -o out.a        # Linux / macOS
+./bin/eml compile -i f.mxeml -of lib -o out.lib      # Windows
+./bin/eml compile -i f.mxeml -of dynamiclib -o out.dylib  # macOS
 ./bin/eml compile -i f.mxeml -of csharp -o out.cs
 ./bin/eml compile -i f.mxeml -of csharpdll -o out.dll
 ./bin/eml compile -i f.mxeml -of csharpexe -o out.exe   # Windows
@@ -180,9 +198,9 @@ binaries:
 ```
 
 - `-of` / `--output-format` — `beml` (default), `eml`, `js`, `c`, `clib`,
-  `csharp`, `csharplib`, `csharpdll`, `csharplibdll`, `csharpexe`, `fsharp`,
-  `fsharplib`, `visualbasic`, `visualbasiclib`, `dotil`, or `dotillib`
-  (replaces old `-f` / `--format`)
+  `exe`, `lib`, `dynamiclib`, `csharp`, `csharplib`, `csharpdll`,
+  `csharplibdll`, `csharpexe`, `fsharp`, `fsharplib`, `visualbasic`,
+  `visualbasiclib`, `dotil`, or `dotillib` (replaces old `-f` / `--format`)
 - Same-format compile is an error (`eml`→`eml`, `beml`→`beml`)
 - `--format` / `-f` is rejected; use `-of`
 - `-of js` writes a classic browser script that defines `eml(x, y)` with
@@ -199,6 +217,14 @@ binaries:
   companion `.h` with the entry prototype; add `--emit-eml` to also declare
   `eml` in the header (otherwise `eml` is `static` in the `.c` only). Without
   `-o`, only the `.c` goes to stdout.
+- `-of exe` emits C with `static eml`, a named entry (default `compute`, `-fn`),
+  and `main` that prints the result, then invokes clang/gcc/cl. Requires `-o`.
+  Extension rules match `csharpexe` (`.exe` on Windows, no extension elsewhere).
+- `-of lib` emits clib-style C, builds a static library (`.a` / `.lib`), and
+  writes a companion `.h`. Default entry is `compute` (`-fn`). `--emit-eml`
+  exports `eml` in the header (same as clib).
+- `-of dynamiclib` emits clib-style C with Windows export macros, builds a
+  shared library (`.so` / `.dylib` / `.dll`), and writes a companion `.h`.
 - `-of csharp` / `csharplib` write C# source (`System.Numerics.Complex`).
   Default entry is `Compute` (`-fn`). With `-o`, also write a companion
   `.csproj` unless `--no-companion-project`. Without `-o`, source only.
@@ -298,11 +324,21 @@ non-taylor samples into `.results/_chain/` then piping into tokenize/parse/compi
 ./scripts/run_samples.ps1 -Operations tokenize,parse
 ./scripts/run_samples.ps1 -Operations tokenize,parse,compile,run
 ./scripts/run_samples.ps1 --operations preproc tokenize parse compile run
+./scripts/run_samples.ps1 -Operations compile -CompileFormats exe,lib
+./scripts/run_samples.ps1 --operations compile --compile-formats exe lib
+./scripts/run_samples.ps1 -Operations compile -CompileInputFormats mxeml -CompileFormats exe
+./scripts/run_samples.ps1 --operations compile --compile-input-formats teml --compile-formats js
 ```
 
 `-Operations` / `--operations` selects which front-end steps to run (`preproc`,
 `tokenize`, `parse`, `compile`, `run`). Pass a comma-separated list or multiple values after
 `--operations`. If omitted, **all** operations are run.
+
+With `compile`, `-CompileFormats` / `--compile-formats` limits which `eml
+compile -of` targets are exercised (e.g. `exe`, `lib`, `dynamiclib`). If
+omitted, every compile format the script normally runs is checked.
+`-CompileInputFormats` / `--compile-input-formats` limits input formats
+(`mxeml`, `teml`, `eml`, `beml`); if omitted, all four are checked.
 
 The script passes dummy `--var` bindings for sample variable names and
 `--warn none`. Outputs go to `.results/<operation>/` (gitignored) except `run`,
@@ -311,9 +347,10 @@ which captures stdout into a variable (not printed) and checks
 (and for IR chaining). For `parse`, each sample is emitted in all four formats.
 For `compile`, each sample writes default `.beml`, `-of eml` `.eml`, and (for
 non-taylor sources) `-of js` `.js` plus companion `.html`, plus `-of c` /
-`-of clib` (`.c`, and `.h` for clib), plus C# / F# / VB / IL source formats.
-DLL formats (`csharpdll`, `csharplibdll`, `csharpexe`) run only when `dotnet`
-is on `PATH`. Exit `1`
+`-of clib` (`.c`, and `.h` for clib), plus native `-of exe` / `lib` /
+`dynamiclib` when a C compiler is on `PATH`, plus C# / F# / VB / IL source
+formats. DLL formats (`csharpdll`, `csharplibdll`, `csharpexe`) run only when
+`dotnet` is on `PATH`. Exit `1`
 if any sample fails.
 
 ## Test
@@ -352,6 +389,7 @@ paths.
 | `src/interpreter.*` | In-process ONE/EML interpreter (`eml run`) |
 | `src/js_backend.*` | JavaScript backend (`-of js`) |
 | `src/c_backend.*` | C program and library backends |
+| `src/c_build.*` | Native C compile driver (exe / lib / dynamiclib) |
 | `src/dotnet_backend.*` | C# source / csproj emitter |
 | `src/dotnet_build.*` | `dotnet build` / `publish` for DLL and exe |
 | `src/fsharp_backend.*` | F# source / fsproj emitter |
