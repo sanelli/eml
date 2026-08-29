@@ -256,7 +256,7 @@ eml compile [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--outp
 - Flag order free; space-separated only (no `--output-format=`)
 - Repeated `--output-format`, `-fn`, `--framework`, `--no-companion-project`, or `--emit-eml` is invalid CLI
 - `eml help compile` → usage on stdout, exit `0`
-- Unknown `-of` values (including `cli`, future `wasm`, `wat`, and the spelling `javascript`) are invalid CLI
+- Unknown `-of` values (including `cli` and the spelling `javascript`) are invalid CLI
 - Exit `0` on success; `1` on invalid CLI, I/O, preprocess, lex, parse, same-format, or `dotnet` errors
 
 ### Same-format compile (rejected)
@@ -377,8 +377,6 @@ eml compile -i f.mxeml -of csharpexe -o out.exe
 eml compile -i f.mxeml -of csharpexe -o out
 ```
 
-wasm / wat backends (`-of wasm`, `wat`) are not implemented yet.
-
 ## `run`
 
 Interpret IR EML on a Long_Float complex stack and print one compact complex value on **stdout**. No file output.
@@ -390,7 +388,6 @@ eml run [--input|-i <file>] [--input-format|-if mxeml|teml|eml|beml] [--var|-v $
 - Effective input may be any of the four formats
 - `--output` / `-o` and `--output-format` / `-of` are invalid CLI (dedicated diagnostics, then usage)
 - `--var` / `-v` and `--warn` / `-w` — same shared rules as compile. Meaningful only for **mxeml / teml** (preprocessor paste). On **eml / beml**, every `--var` is unused
-- `$NAME:VALUE` extras are **not implemented** (still `CLI_Unexpected_Argument`)
 - `eml help run` → usage on stdout, exit `0`
 - Exit `0` on success; `1` on invalid CLI, I/O, preprocess, lex, parse, or runtime errors
 

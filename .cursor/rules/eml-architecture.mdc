@@ -7,9 +7,8 @@ alwaysApply: true
 
 - Language: **Ada**
 - Toolchain: **Alire**
-- Libraries (Ada crate): **no third-party crates**. All GNAT/Ada standard libraries are allowed. The VS Code extension may use the VS Code extension APIs (and usual npm tooling).
+- Libraries (Ada crate): **no third-party crates**. All GNAT/Ada standard libraries are allowed.
 - Ship **one Ada executable** (compiler + interpreter), named `eml`.
-- Also ship a **VS Code extension** (separate from the Ada crate; see `eml-vscode`).
 
 ## Required components
 

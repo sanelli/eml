@@ -5,10 +5,7 @@ alwaysApply: true
 
 # Project objective
 
-Build:
-
-- a **single Ada executable** (`eml`) that is both a **compiler** and an **interpreter**
-- a **VS Code extension** for `.mxeml` / `.teml` / `.eml` (declarative editing; see `eml-vscode` rule)
+Build a **single Ada executable** (`eml`) that is both a **compiler** and an **interpreter**.
 
 The compiler reads one of four input formats (`.mxeml`, `.teml`, `.eml`, `.beml`) and emits stack EML text, binary `.beml`, JavaScript, C, native binaries (`exe`, `lib`, `dynamiclib`), or .NET sources/DLLs/exes (`csharp`, `csharplib`, `csharpdll`, `csharplibdll`, `csharpexe`, `fsharp`, `visualbasic`, `dotil`, …). The interpreter runs any of those inputs via `eml run`. CLI: `eml-cli`. CI/releases: `eml-ci`.
 
@@ -42,4 +39,3 @@ The local clone folder may still be named `elm`. Do not rename that folder or an
 ## Open items (do not invent)
 
 - Whether `log` is natural log (as in the paper) or another base.
-- Runtime ABI for `$VARNAME` inside generated binaries (as opposed to `eml run`).

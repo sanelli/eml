@@ -1,5 +1,5 @@
 ---
-description: Step-by-step implementation process and features that stay out of scope
+description: Step-by-step implementation process
 alwaysApply: true
 ---
 
@@ -9,7 +9,7 @@ The user will request **code in small chunks**. For each **new feature**:
 
 - First produce a **plan** (`eml-planning`): numbered steps, matching numbered TODOs, and tests. Do not implement until the user starts a chunk.
 - Check the git branch name matches the plan. If not, **ask** to create one from `main`. After permission, **create** that feature branch before coding. Do not implement on `main` unless told to.
-- Implement **only** that chunk. Do not write ahead (other packages, unused backends, the VS Code extension, CI YAML, extras).
+- Implement **only** that chunk. Do not write ahead (other packages, unused backends, CI YAML, extras).
 - Match existing Ada/Alire layout once it exists.
 - After a chunk, stop. Summarize what was added and what is still missing for that chunk.
 - Do not commit or push unless asked. When committing feature work, **always include the plan** under `.cursor/plans/` (see `eml-planning`). **Never delete** plan files — not to unblock merges/checkouts; `git add` or stash untracked plans instead (see `eml-planning`). Network commands: `eml-shell` (grant network, clear proxy env vars).
@@ -17,14 +17,3 @@ The user will request **code in small chunks**. For each **new feature**:
 ## Tests
 
 Every new feature **must** have tests (happy path and, where possible, negative path: parse errors, bad tokens, unsupported syntax, bad CLI).
-
-When possible, **report code coverage** for the change (tooling TBD; do not skip tests because coverage is not wired yet).
-
-## Out of scope until explicitly requested
-
-- LaTeX (or other) input besides `.mxeml` / `.teml` / `.eml` / `.beml`
-- Extra debug (traces, stepwise evaluation UI). `eml tokenize` and `eml parse` dumps are in scope.
-- Optimizations (algebraic simplification, EML-tree depth reduction, backend opts)
-- Programmatic VS Code features (language server, completions, diagnostics) beyond declarative editing
-
-Do not design APIs around these until they are in scope.

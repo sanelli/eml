@@ -1,6 +1,6 @@
 name = "eml"
 description = "EML compiler and interpreter"
-version = "0.1.0-dev"
+version = "1.0"
 
 authors = ["Stefano Anelli"]
 maintainers = ["Stefano Anelli <redacted@redacted.com>"]

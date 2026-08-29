@@ -1972,25 +1972,6 @@ package body CLI_Tests is
       end;
 
       declare
-         In_Path : constant String :=
-           Write_Temp ("cli_compile_wasm.mxeml", "1");
-         Args    : constant Eml.CLI.Arg_Array :=
-           [A ("--no-logo"),
-            A ("--no-color"),
-            A ("compile"),
-            A ("-i"),
-            A (In_Path),
-            A ("-of"),
-            A ("wasm")];
-         Status  : constant Ada.Command_Line.Exit_Status :=
-           Eml.CLI.Run (Args);
-      begin
-         Require
-           (Status = Ada.Command_Line.Failure,
-            "cli-compile-wasm: exit");
-      end;
-
-      declare
          In_Path  : constant String :=
            Write_Temp ("cli_compile_js_fn.mxeml", "e");
          Out_Path : constant String :=

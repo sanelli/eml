@@ -19,7 +19,7 @@ isProject: false
 
 # Compile native C (`exe` / `lib` / `dynamiclib`)
 
-Stay off **`main`**. After this plan is accepted, create **`feature/compile-native-c`** from `main` (ask first; do not implement on `main`). Keep this plan under [`.cursor/plans/`](.cursor/plans/) (never delete plan files). Commit it with the feature work when committing.
+Keep this plan under [`.cursor/plans/`](.cursor/plans/) (never delete plan files). Commit it with the feature work when committing.
 
 Mirror the existing [`Dotnet_Build`](src/dotnet_build.ads) flow (temp dir, spawn, copy `-o`, always `Delete_Tree`), but drive **C** via [`C_Backend`](src/c_backend.ads) instead of `dotnet`.
 

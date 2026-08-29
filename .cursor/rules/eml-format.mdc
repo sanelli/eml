@@ -17,15 +17,13 @@ Paired with the constant `1` (`ln(1) = 0`), this generates the scientific-calcul
 
 ## Nested tree text (`.teml`)
 
-Closed programs are a binary tree of `eml` and `1`. Parameterized programs also allow `$VARNAME` as **preprocessor** paste sites (bound by `--var` on `preproc` / `tokenize` / `parse` / `compile`; not IR leaves after a successful preprocess):
+Closed programs are a binary tree of `eml` and `1`. Parameterized programs also allow `$VARNAME` as **preprocessor** paste sites (bound by `--var` on `preproc` / `tokenize` / `parse` / `compile`):
 
 ```
 S → 1 | eml(S, S)
 ```
 
-A `.teml` file contains only nested `1` and `eml(...)` (whitespace allowed). No numbers other than `1`, no math operators, no stack opcodes `ONE`/`EML`.
-
-Paper-style `$VARNAME` leaves inside IR remain out of scope: after preprocess, IR is still only `1` and `eml(S, S)`.
+A `.teml` file contains only nested `1` and `eml(...)` (whitespace allowed). No numbers other than `1`, no math operators, no stack opcodes `ONE`/`EML`. After preprocess, IR is still only `1` and `eml(S, S)`.
 
 ## Stack-machine IR (`eml compile`)
 
@@ -63,7 +61,7 @@ Same-format compile is rejected: `.eml` → `-of eml` and `.beml` → `-of beml`
 - `exp(x) = eml(x, 1)`
 - `ln(z) = eml(1, eml(eml(1, z), 1))`
 
-Further rewrites (arithmetic, trig, constants, …) come from that paper. Prefer its identities over ad-hoc equivalents unless a later optimization pass says otherwise.
+Further rewrites (arithmetic, trig, constants, …) come from that paper. Prefer its identities over ad-hoc equivalents.
 
 ## Interpreter
 

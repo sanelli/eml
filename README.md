@@ -240,7 +240,6 @@ binaries:
 - `-of dotil` / `dotillib` write IL text for `ilasm` (`.il`; no project file).
 - `--framework` (default `net8.0`) applies to the .NET formats. Programs
   accept `netX.0` only; libraries also accept `netstandard2.0` / `2.1`.
-- **Future (not implemented yet):** compile targets **`wasm`** and **`wat`**.
 
 ### Run
 
@@ -256,7 +255,6 @@ Evaluate IR EML and print one compact complex value on stdout. No `-o` / `-of`.
 - Accepts all four input formats
 - `--var` / `-v` on **mxeml / teml** only (preprocessor paste). On `.eml` /
   `.beml`, every `--var` is unused (same warn/error as compile)
-- `$NAME:VALUE` runtime bindings are not implemented yet
 - `--output` / `-o` and `--output-format` / `-of` are invalid CLI
 
 ## EML file formats

@@ -51,10 +51,4 @@ reported). Unused `--var` bindings emit warnings unless `--warn none`.
 
 Preprocessor also applies to **`.teml`** (nested tree text). On **`.eml`** / **`.beml`**, the preprocessor is off; any `--var` is unused (same warn/error modes).
 
-After preprocessing, the mxeml language has no `$VAR` tokens. On future
-`eml run`, bindings may use a separate `$NAME:VALUE` form (not implemented yet).
-
-## Out of scope until requested
-
-- LaTeX input
-- Implicit multiplication, juxtaposition, or other undeclared syntax
+After preprocessing, the mxeml language has no `$VAR` tokens.
